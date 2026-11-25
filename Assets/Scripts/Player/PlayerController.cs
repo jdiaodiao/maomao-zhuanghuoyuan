@@ -37,6 +37,10 @@ namespace CatMart
         float _topHeight = 0.85f;                               // 镜头离台面高度
         float _lift = 0.06f;                                    // 拿着商品时离下方表面的高度
         Vector3 _topTarget;
+        Vector3 _fpTarget;
+        bool _hasFpTarget;
+        /// <summary>第一人称时手臂最远能伸出的水平距离（米）。</summary>
+        const float MaxArm = 1.5f;
         bool _hasTopTarget;
 
         const int IgnoreRaycastLayer = 2;
@@ -156,7 +160,24 @@ namespace CatMart
             }
             else if (Paws != null) Paws.Walking = false;
 
-            if (Held != null) _holdDist = Mathf.Clamp(_holdDist + Input.mouseScrollDelta.y * 0.06f, 0.35f, 1.6f);
+            // 拿着东西：手臂自动伸缩——商品悬停在视线所指的表面上方（看近处手就缩回来，看远处就伸出去）
+            _hasFpTarget = false;
+            if (Held != null && !Placing)
+            {
+                _lift = Mathf.Clamp(_lift + Input.mouseScrollDelta.y * 0.02f, 0.015f, 0.35f);
+                var fpRay = new Ray(Cam.transform.position, Cam.transform.forward);
+                if (Physics.Raycast(fpRay, out var aim, Reach + 0.6f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                {
+                    Vector3 eye = Cam.transform.position;
+                    Vector2 xz = new Vector2(aim.point.x, aim.point.z);
+                    Vector2 eyeXZ = new Vector2(eye.x, eye.z);
+                    // 手够不到太远：水平距离限制在 MaxArm 以内
+                    Vector2 off = xz - eyeXZ;
+                    if (off.magnitude > MaxArm) xz = eyeXZ + off.normalized * MaxArm;
+                    _fpTarget = CarryTarget(xz);
+                    _hasFpTarget = true;
+                }
+            }
             UpdateLook(new Ray(Cam.transform.position, Cam.transform.forward), Reach);
             return true;
         }
@@ -456,6 +477,9 @@ namespace CatMart
         /// <summary>自动测试用：代替鼠标指定俯视目标 (x,z)。</summary>
         public Vector2? DebugTopTarget;
 
+        /// <summary>测试用：设置第一人称视角。</summary>
+        public void DebugLook(float yaw, float pitch) { _yaw = yaw; _pitch = pitch; transform.rotation = Quaternion.Euler(0, yaw, 0); }
+
         public void FocusSlot(int i) => _topFocus = new Vector2(Layout.BagSlotX[i], Layout.BagSlotZ);
 
         public void Grab(GroceryItem item)
@@ -522,11 +546,11 @@ namespace CatMart
                 if (_placeStill >= 3 || _placeTime > 2f) { FinishPlace(); return; }
             }
             else if (TopView) target = _hasTopTarget ? _topTarget : rb.worldCenterOfMass;
-            else target = Cam.transform.position + Cam.transform.forward * _holdDist;
+            else target = _hasFpTarget ? _fpTarget : Cam.transform.position + Cam.transform.forward * _holdDist;
             Vector3 err = target - rb.worldCenterOfMass;
 
             // 卡住太远自动松手（俯视时鼠标移动快，放宽一些）
-            if (!Placing && err.magnitude > (TopView ? 1.5f : 0.7f)) { Release(); return; }
+            if (!Placing && err.magnitude > 1.5f) { Release(); return; }
 
             float m = rb.mass;
             const float k = 320f;

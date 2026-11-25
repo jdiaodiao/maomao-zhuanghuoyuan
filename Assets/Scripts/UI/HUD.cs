@@ -107,7 +107,7 @@ namespace CatMart
 
         static string ControlsText() =>
             "鼠标 看   WASD 移动   左键按住 抓起（松开=轻放，Shift+松开=扔下）   <color=#F2C14E>右键按住 按压</color>（圆圈变红就停）\n" +
-            "滚轮 远近   Q/E 水平转   R/F 前后翻   C 侧放   Z 回正   X 收回空袋\n" +
+            "滚轮 抬高/放低   Q/E 水平转   R/F 前后翻   C 侧放   Z 回正   X 收回空袋\n" +
             "<color=#F2C14E><b>V 俯视装袋</b></color>   Tab 小票   B 重心标记   Enter 完成订单   H 隐藏帮助   M 静音  -/= 音量   Esc 释放鼠标";
 
         // ------------------------------------------------------------ 营业中
@@ -224,7 +224,7 @@ namespace CatMart
                 if (it.IsDamaged) sb.Append("\n<color=#FF6B5B>已损坏</color>");
                 else if (P.Held == null && G.Slots.Any(bg => bg != null && bg.Contains(it) && bg.AboveRim(it))) sb.Append("\n<color=#FFB347>质心高出袋口，不稳！</color>");
                 else if (maxLoad > 0.3f) sb.Append($"\n<color={(maxLoad > 0.8f ? "#FF6B5B" : "#F2C14E")}>受压 {maxLoad * 100:0}%</color>");
-                if (P.Held != null) sb.Append("\n<color=#AAAAAA>Q/E R/F 旋转 · C 侧放 · Z 回正 · 滚轮远近</color>");
+                if (P.Held != null) sb.Append("\n<color=#AAAAAA>Q/E R/F 旋转 · C 侧放 · Z 回正 · 滚轮 抬高/放低</color>");
                 text = sb.ToString();
             }
             else if (P.LookBag != null)

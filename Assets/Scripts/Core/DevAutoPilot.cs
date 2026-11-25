@@ -167,6 +167,9 @@ namespace CatMart
             g.Player.DebugEndPress();
             g.Player.enabled = false;
 
+            // 4a) 第一人称手臂自动伸缩：从传送带末端拿东西，低头看面前台面，东西应该收回来放到面前
+            yield return ReachTest(g);
+
             // 4b) 穿模测试：像玩家一样在俯视模式里把薄而大的零食一件件轻放进袋子
             yield return ClipTest(g);
 
@@ -211,6 +214,33 @@ namespace CatMart
 
             Log("自动测试完成");
             Application.Quit();
+        }
+
+        IEnumerator ReachTest(GameManager g)
+        {
+            var p = g.Player;
+            p.transform.position = new Vector3(-0.3f, 0, -0.6f);
+            p.enabled = true;
+            PlayerController.LockCursor(true);
+            var box = ItemFactory.Create(ItemCatalog.Get("cereal"), new Vector3(-1.2f, Layout.CounterTop + 0.16f, Layout.LaneZ), Quaternion.identity);
+            yield return new WaitForSeconds(0.8f);
+            p.DebugLook(-60, 38);           // 看着传送带末端
+            yield return null;
+            p.Grab(box);
+            yield return new WaitForSeconds(0.6f);
+            p.DebugLook(0, 50);             // 低头看面前的台面
+            yield return new WaitForSeconds(1.2f);
+            yield return Shot("4a_reach_hold");
+            Vector3 eye = p.Cam.transform.position;
+            float dHold = new Vector2(box.WorldCom.x - eye.x, box.WorldCom.z - eye.z).magnitude;
+            p.PlaceGently();
+            for (float t = 0; t < 3f && p.Placing; t += Time.deltaTime) yield return null;
+            yield return new WaitForSeconds(0.8f);
+            Vector3 c = box.WorldCom;
+            bool onTable = c.y < Layout.CounterTop + 0.25f && c.y > Layout.CounterTop && c.z > -0.12f && c.z < 0.5f && Mathf.Abs(c.x) < 0.9f;
+            Log($"手臂伸缩测试: 拿着时离眼睛水平 {dHold:0.00}m; 放下后位置 {c} 在面前台面上={onTable} 损坏={box.IsDamaged} (期望 True/False)");
+            Destroy(box.gameObject);
+            p.enabled = false;
         }
 
         IEnumerator ClipTest(GameManager g)
