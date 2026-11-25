@@ -195,10 +195,45 @@ namespace CatMart
                 Sfx.Play("meow", 1f);
             }
 
+            ReturnLostItems();
+
             if (Store.Feeder.Spawned.Count != _lastSpawnCount)
             {
                 _lastSpawnCount = Store.Feeder.Spawned.Count;
                 if (Store.Cashier != null) Store.Cashier.ScanAnim = 0.4f;
+            }
+        }
+
+        // ------------------------------------------------------------ 掉到够不着的地方 → 顾客帮忙捡回来
+        readonly Dictionary<GroceryItem, float> _lostTimers = new Dictionary<GroceryItem, float>();
+
+        /// <summary>玩家走不过去的区域（打包台对面、两端外侧）的地面。</summary>
+        static bool Unreachable(Vector3 p) =>
+            p.y < 0.45f && (p.z > Layout.LaneZ + 0.33f || p.x > 2.4f || p.x < Layout.BeltStartX - 0.1f);
+
+        void ReturnLostItems()
+        {
+            foreach (var it in Store.Feeder.Spawned)
+            {
+                if (it == null || it.IsDestroyed || it.Held) continue;
+                if (!Unreachable(it.WorldCom) || StoreBuilder.InCart(Store.Cart, it)) { _lostTimers.Remove(it); continue; }
+                _lostTimers.TryGetValue(it, out float t);
+                t += Time.deltaTime;
+                _lostTimers[it] = t;
+                if (t < 1.2f) continue;
+
+                // 放回传送带靠近末端的位置，由传送带送回来
+                _lostTimers.Remove(it);
+                var rb = it.Rb;
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+                Vector3 pos = new Vector3(Layout.BeltEndX - 0.5f, Layout.CounterTop + it.Def.Size.y / 2 + 0.03f, Layout.LaneZ);
+                rb.position = pos;
+                rb.rotation = Quaternion.identity;
+                it.transform.SetPositionAndRotation(pos, Quaternion.identity);
+                Sfx.Play("meow", 0.5f);
+                ShowToast($"{Order.CustomerName} 帮你把掉下去的 {it.Def.Name} 捡回来了，放在传送带上");
+                break; // 每帧最多一件，避免叠在一起
             }
         }
 

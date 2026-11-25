@@ -8,22 +8,22 @@ namespace CatMart
     /// <summary>场景尺寸常量（米）。</summary>
     public static class Layout
     {
-        public const float CounterTop = 0.9f;
+        public const float CounterTop = 0.82f;
         public const float LaneZ = 0.2f;
         public static readonly float[] BagSlotX = { -0.62f, -0.2f, 0.22f, 0.64f };
-        public const float BagSlotZ = 0.22f;
+        public const float BagSlotZ = 0.17f;
 
         public const float BeltStartX = -4.3f, BeltEndX = -0.9f, BeltWidth = 0.48f;
         public const float EyeX = -1.02f;
 
-        public static readonly Vector3 CartCenter = new Vector3(-0.3f, 0f, 0.9f);
+        public static readonly Vector3 CartCenter = new Vector3(1.83f, 0f, 0.12f);  // 打包台最右端
         public static readonly Vector3 CartInner = new Vector3(0.8f, 0.42f, 0.44f); // 宽 高 深
         public const float CartFloorY = 0.55f;
 
         public static readonly Vector3 CustomerPos = new Vector3(0.5f, 0, 1.2f);
         public static readonly Vector3 PlayerStart = new Vector3(0f, 1.5f, -0.6f);
         public static readonly Vector2 PlayerMinXZ = new Vector2(-1.4f, -1.2f);
-        public static readonly Vector2 PlayerMaxXZ = new Vector2(1.5f, -0.38f);
+        public static readonly Vector2 PlayerMaxXZ = new Vector2(2.0f, -0.38f);
     }
 
     public class StoreRefs
@@ -221,9 +221,18 @@ namespace CatMart
             BuildCounterBody(v, new Vector3(0, 0, Layout.LaneZ), 1.75f, 0.62f);
             Col(root, new Vector3(0, top - 0.015f, Layout.LaneZ), new Vector3(1.75f, 0.03f, 0.62f), "打包台面");
             Col(root, new Vector3(0, top / 2 - 0.02f, Layout.LaneZ), new Vector3(1.75f, top - 0.04f, 0.6f), "打包台体");
-            // 后挡板
-            v.Add(Shapes.RoundedBox(new Vector3(1.75f, 0.07f, 0.025f), 0.01f, 3, 2), new Vector3(0, top + 0.03f, Layout.LaneZ + 0.32f), Quaternion.identity, SteelSatin);
-            Col(root, new Vector3(0, top + 0.03f, Layout.LaneZ + 0.32f), new Vector3(1.75f, 0.06f, 0.02f), "后挡板");
+            // 后挡板：不锈钢底座 + 透明亚克力 + 顶部扶手，防止商品掉到顾客那边
+            {
+                float x0 = -0.875f, x1 = 1.37f, gz = Layout.LaneZ + 0.315f;
+                float len = x1 - x0, cx = (x0 + x1) / 2, gh = 0.18f;
+                v.Add(Shapes.RoundedBox(new Vector3(len, 0.035f, 0.03f), 0.008f, 2, 2), new Vector3(cx, top + 0.0175f, gz), Quaternion.identity, SteelSatin);
+                v.Add(Shapes.RoundedBox(new Vector3(len - 0.02f, gh - 0.04f, 0.008f), 0.003f, 2, 2), new Vector3(cx, top + 0.035f + (gh - 0.04f) / 2, gz), Quaternion.identity,
+                    Mats.Glass(new Color(0.9f, 0.96f, 1f), 0.16f, 0.97f));
+                v.Add(Shapes.Tube(new[] { new Vector3(x0, top + gh, gz), new Vector3(x1, top + gh, gz) }, new[] { 0.009f, 0.009f }, 12), Chrome);
+                for (float px = x0 + 0.02f; px <= x1; px += (len - 0.04f) / 4f)
+                    v.Add(Shapes.Tube(new[] { new Vector3(px, top, gz), new Vector3(px, top + gh, gz) }, new[] { 0.007f, 0.007f }, 10), Chrome);
+                Col(root, new Vector3(cx, top + gh / 2, gz), new Vector3(len, gh, 0.03f), "后挡板");
+            }
             // 前面板 logo 贴
             var st = new LabelStyle { Brand = "CatMart", Title = "谢谢惠顾 · 欢迎再来", Bg = Orange, Bg2 = Color.Lerp(Orange, Color.black, 0.15f), Accent = Navy, Ink = Color.white, Icon = LabelIcon.Cat, IconColor = Color.white, Seed = 3 };
             var tex = LabelBaker.Sticker(new Vector2(0.9f, 0.3f), st, true);
@@ -251,8 +260,8 @@ namespace CatMart
             BagSize[] sizes = { BagSize.Small, BagSize.Medium, BagSize.Large };
             for (int i = 0; i < 3; i++)
             {
-                BagFactory.CreateRackStack(root, BagSpec.Get(BagMaterial.Paper, sizes[i]), new Vector3(0.96f + i * 0.155f, top, 0.37f));
-                BagFactory.CreateRackStack(root, BagSpec.Get(BagMaterial.Plastic, sizes[i]), new Vector3(0.96f + i * 0.155f, top, 0.07f));
+                BagFactory.CreateRackStack(root, BagSpec.Get(BagMaterial.Paper, sizes[i]), new Vector3(0.96f + i * 0.155f, top, 0.2f));
+                BagFactory.CreateRackStack(root, BagSpec.Get(BagMaterial.Plastic, sizes[i]), new Vector3(0.96f + i * 0.155f, top, -0.01f));
             }
 
             // 猫铃
@@ -577,13 +586,13 @@ namespace CatMart
             BuildCounterBody(v, new Vector3(-1.8f, 0, -2.6f), 3.6f, 0.6f, false);
             var beltMat = new Material(BeltRubber);
             beltMat.mainTextureScale = new Vector2(3.4f / 0.25f, 1);
-            v.Add(Shapes.RoundedBox(new Vector3(3.4f, 0.03f, 0.46f), 0.012f, 3, 2, (f, l) => l), new Vector3(-1.8f, 0.895f, -2.6f), Quaternion.identity, beltMat);
+            v.Add(Shapes.RoundedBox(new Vector3(3.4f, 0.03f, 0.46f), 0.012f, 3, 2, (f, l) => l), new Vector3(-1.8f, Layout.CounterTop - 0.005f, -2.6f), Quaternion.identity, beltMat);
             foreach (int s in new[] { -1, 1 })
-                v.Add(Shapes.RoundedBox(new Vector3(3.6f, 0.075f, 0.05f), 0.012f, 3, 2), new Vector3(-1.8f, 0.9f, -2.6f + s * 0.27f), Quaternion.identity, SteelTop);
+                v.Add(Shapes.RoundedBox(new Vector3(3.6f, 0.075f, 0.05f), 0.012f, 3, 2), new Vector3(-1.8f, Layout.CounterTop, -2.6f + s * 0.27f), Quaternion.identity, SteelTop);
             v.Add(Shapes.Tube(new[] { new Vector3(0.1f, 0, -2.3f), new Vector3(0.1f, 2.2f, -2.3f) }, new[] { 0.028f, 0.024f }, 14), Chrome);
             v.Add(Shapes.Lathe(Shapes.Fillet(LookKit.P(0, 2.18f, 0.16f, 2.18f, 0.16f, 2.42f, 0, 2.42f), 0.02f, 3), 40), new Vector3(0.1f, 0, -2.3f), Quaternion.identity, Mats.Emissive(Orange, Orange * 0.5f));
             v.Spawn(root, "4号收银台");
-            Col(root, new Vector3(-1.8f, 0.45f, -2.6f), new Vector3(3.6f, 0.9f, 0.6f), "4号台碰撞");
+            Col(root, new Vector3(-1.8f, Layout.CounterTop / 2, -2.6f), new Vector3(3.6f, Layout.CounterTop, 0.6f), "4号台碰撞");
             Text3D.Create(root, "4", new Vector3(0.1f, 2.3f, -2.3f + 0.165f), 0.17f, Color.white, TextAnchor.MiddleCenter, Quaternion.Euler(0, 180, 0));
         }
 

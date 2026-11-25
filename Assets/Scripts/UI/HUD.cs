@@ -170,7 +170,7 @@ namespace CatMart
                 GUI.Box(tr, GUIContent.none, _panel);
                 GUI.Label(tr, P.Held != null
                     ? "<b>俯视装袋</b> · 移动鼠标摆放 · 松开左键放下 · 滚轮 抬高/放低 · Q/E R/F C Z 旋转 · 橙圈 = 落点"
-                    : "<b>俯视装袋</b> · 左键按住拿商品 · WASD 平移 · 滚轮 缩放 · 1-4 跳到袋位 · V / Esc 返回第一人称", _center);
+                    : "<b>俯视装袋</b> · 左键按住拿商品 · WASD 平移 · 滚轮 缩放 · 1-4 袋位 · 5 购物车 · V / Esc 返回第一人称", _center);
             }
             else if (P != null && P.CursorLocked)
             {

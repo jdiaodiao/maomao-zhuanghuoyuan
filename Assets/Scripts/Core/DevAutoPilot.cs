@@ -76,11 +76,20 @@ namespace CatMart
             g.Player.FocusSlot(0);
             yield return new WaitForSeconds(0.8f);
             yield return Shot("2b_topview");
-            var extra = ItemFactory.Create(ItemCatalog.Get("cereal"), new Vector3(-0.2f, Layout.CounterTop + 0.2f, 0.22f), Quaternion.identity);
-            g.Player.Grab(extra);
+            // 轨迹测试：把放在袋子旁边台面上的麦片拿进 1 号袋（需要越过袋壁）
+            var bag1 = g.Slots[0];
+            var extra = ItemFactory.Create(ItemCatalog.Get("canned_soup"), new Vector3(-0.425f, Layout.CounterTop + 0.06f, -0.04f), Quaternion.identity);
             yield return new WaitForSeconds(0.8f);
+            g.Player.Grab(extra);
+            g.Player.DebugTopTarget = new Vector2(bag1.transform.position.x, bag1.transform.position.z);
+            yield return new WaitForSeconds(0.6f);
             yield return Shot("2c_topview_hold");
+            yield return new WaitForSeconds(2.5f);
             g.Player.Release();
+            g.Player.DebugTopTarget = null;
+            yield return new WaitForSeconds(1.5f);
+            Log($"轨迹测试: 罐头从台面越过袋壁放进1号袋 inBag={bag1.Contains(extra)} damaged={extra.IsDamaged} pos={extra.transform.position} (期望 inBag=True)");
+            yield return Shot("2d_topview_placed");
             Destroy(extra.gameObject);
             g.Player.SetTopView(false, false);
             g.Player.enabled = false;
@@ -103,10 +112,10 @@ namespace CatMart
             float top0 = Layout.CounterTop;
 
             // 1) 牛奶压薯片
-            var chips = ItemFactory.Create(ItemCatalog.Get("chips"), new Vector3(-0.62f, top0 + 0.05f, 0.2f), Quaternion.Euler(90, 0, 0));
+            var chips = ItemFactory.Create(ItemCatalog.Get("chips"), new Vector3(0.64f, top0 + 0.05f, 0.25f), Quaternion.Euler(90, 0, 0));
             // 2) 鸡蛋从 60cm 摔下
             var eggs = ItemFactory.Create(ItemCatalog.Get("eggs"), new Vector3(-0.2f, top0 + 0.6f, 0.2f), Quaternion.identity);
-            var eggs2 = ItemFactory.Create(ItemCatalog.Get("eggs"), new Vector3(0.64f, top0 + 0.12f, 0.12f), Quaternion.identity);
+            var eggs2 = ItemFactory.Create(ItemCatalog.Get("eggs"), new Vector3(0.64f, top0 + 0.12f, 0.0f), Quaternion.identity);
             eggs.Rb.isKinematic = true; eggs2.Rb.isKinematic = true;
             yield return new WaitForSeconds(0.8f);
             eggs.Rb.isKinematic = false; eggs2.Rb.isKinematic = false;
@@ -115,7 +124,7 @@ namespace CatMart
             // 4) 塑料袋 + 竹签 + 重物压
             g.SpawnBag(BagSpec.Get(BagMaterial.Plastic, BagSize.Medium)); // 会进第一个空位
             yield return new WaitForSeconds(1.0f);
-            var milk = ItemFactory.Create(ItemCatalog.Get("milk_gallon"), new Vector3(-0.62f, top0 + 0.3f, 0.2f), Quaternion.identity);
+            var milk = ItemFactory.Create(ItemCatalog.Get("milk_gallon"), new Vector3(0.64f, top0 + 0.3f, 0.25f), Quaternion.identity);
             var soup = ItemFactory.Create(ItemCatalog.Get("canned_soup"), new Vector3(0.22f, top0 + 0.2f, 0.2f), Quaternion.identity);
             var bag = g.Slots.First(b => b != null);
             var skewers = ItemFactory.Create(ItemCatalog.Get("skewers"), bag.transform.position + new Vector3(0, 0.03f, 0), Quaternion.Euler(0, 0, 90 - 90));

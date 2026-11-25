@@ -40,7 +40,7 @@ namespace CatMart
 
         const int IgnoreRaycastLayer = 2;
         const float EyeHeight = 1.5f;
-        static readonly Vector2 TopMin = new Vector2(-1.35f, -0.05f), TopMax = new Vector2(1.3f, 0.5f);
+        static readonly Vector2 TopMin = new Vector2(-1.35f, -0.05f), TopMax = new Vector2(2.1f, 0.5f);
 
         void Start()
         {
@@ -140,6 +140,8 @@ namespace CatMart
             for (int i = 0; i < Layout.BagSlotX.Length; i++)
                 if (Input.GetKeyDown(KeyCode.Alpha1 + i) || Input.GetKeyDown(KeyCode.Keypad1 + i))
                     _topFocus = new Vector2(Layout.BagSlotX[i], Layout.BagSlotZ);
+            if (Input.GetKeyDown(KeyCode.Alpha5) || Input.GetKeyDown(KeyCode.Keypad5))
+                _topFocus = new Vector2(Layout.CartCenter.x, Layout.CartCenter.z);
             _topFocus = Vector2.Max(TopMin, Vector2.Min(TopMax, _topFocus));
 
             float scroll = Input.mouseScrollDelta.y;
@@ -149,14 +151,68 @@ namespace CatMart
             var ray = Cam.ScreenPointToRay(Input.mousePosition);
             UpdateLook(ray, 6f);
 
+            // 测试用：直接指定目标位置
+            if (DebugTopTarget.HasValue && Held != null) { _topTarget = CarryTarget(DebugTopTarget.Value); _hasTopTarget = true; return; }
+
             // 拿着东西：目标点 = 鼠标指向的表面 + 商品半高 + 抬起高度
             _hasTopTarget = false;
             if (Held != null && Physics.Raycast(ray, out var hit, 6f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
-                float halfH = HeldHalfHeight();
-                _topTarget = hit.point + Vector3.up * (halfH + _lift);
+                _topTarget = CarryTarget(new Vector2(hit.point.x, hit.point.z));
                 _hasTopTarget = true;
             }
+        }
+
+        /// <summary>
+        /// "手的轨迹"：沿当前位置→目标位置采样，用商品整个底面向下探测最高障碍（袋子边沿、其他商品）。
+        /// 商品底部低于障碍时先原地抬起，越过后再平移，到了目标上方再降下去。
+        /// </summary>
+        Vector3 CarryTarget(Vector2 targetXZ)
+        {
+            GetHeldBounds(out Bounds b);
+            Vector3 com = Held.WorldCom;
+            Vector2 curXZ = new Vector2(com.x, com.z);
+            Vector2 half = new Vector2(b.extents.x, b.extents.z) * 0.9f;
+            float bottomOffset = com.y - b.min.y;
+
+            // 路径上的最高表面（含起点和终点）
+            float need = 0;
+            const int samples = 6;
+            for (int i = 0; i <= samples; i++)
+                need = Mathf.Max(need, SurfaceHeight(Vector2.Lerp(curXZ, targetXZ, i / (float)samples), half));
+            float targetSurface = SurfaceHeight(targetXZ, half);
+
+            float carryY = need + bottomOffset + Mathf.Max(_lift, 0.02f);
+            bool far = (targetXZ - curXZ).magnitude > 0.025f;
+            if (far)
+            {
+                // 还没越过障碍 → 先抬起来，水平不动
+                if (b.min.y < need + 0.008f) return new Vector3(curXZ.x, carryY + 0.01f, curXZ.y);
+                return new Vector3(targetXZ.x, carryY, targetXZ.y);
+            }
+            // 已到目标上方 → 降到目标表面上方 _lift 的高度
+            return new Vector3(targetXZ.x, targetSurface + bottomOffset + _lift, targetXZ.y);
+        }
+
+        void GetHeldBounds(out Bounds b)
+        {
+            bool first = true;
+            b = new Bounds(Held.WorldCom, Vector3.one * 0.05f);
+            foreach (var p in Held.Parts)
+            {
+                if (p.Col == null || !p.Col.enabled) continue;
+                if (first) { b = p.Col.bounds; first = false; } else b.Encapsulate(p.Col.bounds);
+            }
+        }
+
+        /// <summary>某个水平位置、给定底面尺寸下，最高的支撑面高度。</summary>
+        static float SurfaceHeight(Vector2 xz, Vector2 halfXZ)
+        {
+            var origin = new Vector3(xz.x, 3f, xz.y);
+            var half = new Vector3(Mathf.Max(halfXZ.x, 0.01f), 0.005f, Mathf.Max(halfXZ.y, 0.01f));
+            if (Physics.BoxCast(origin, half, Vector3.down, out var hit, Quaternion.identity, 3.5f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                return hit.point.y;
+            return 0f;
         }
 
         // ---------------- 落点标记（俯视时显示商品正下方会落在哪）----------------
@@ -252,6 +308,9 @@ namespace CatMart
             if (LookBell) return;
             LookBag = hit.collider.GetComponentInParent<Bag>();
         }
+
+        /// <summary>自动测试用：代替鼠标指定俯视目标 (x,z)。</summary>
+        public Vector2? DebugTopTarget;
 
         public void FocusSlot(int i) => _topFocus = new Vector2(Layout.BagSlotX[i], Layout.BagSlotZ);
 
