@@ -349,6 +349,25 @@ namespace CatMart
             return grid ? new Color(0.75f, 0.75f, 0.76f) : G(0.95f * pits);
         }));
 
+        /// <summary>森友会风木地板：暖色浅木条，错缝拼接，柔和木纹。</summary>
+        public static Texture2D WoodPlanks => Get("planks", () => Make(512, 512, (u, v) =>
+        {
+            const int rows = 4;
+            float rv = v * rows;
+            int row = Mathf.FloorToInt(rv);
+            float off = (row % 2) * 0.5f + (row % 3) * 0.17f;
+            float pu = Frac(u * 2 + off);                     // 每行 2 块板
+            int plank = row * 7 + Mathf.FloorToInt(u * 2 + off);
+            float tone = Noise.Value2(plank * 3.1f, 0.5f, 401) * 0.12f;
+            float grain = Noise.Fbm2(u * 6, v * 60, 3, 402, 0) * 0.06f;
+            bool seam = Frac(rv) < 0.018f || pu < 0.006f;
+            Color baseC = new Color(0.93f, 0.80f, 0.62f);
+            Color c = baseC * (0.94f + tone + grain);
+            if (seam) c = baseC * 0.72f;
+            c.a = 1;
+            return c;
+        }));
+
         public static Texture2D Gradient(Color top, Color bottom) => Get("grad" + top + bottom, () => Make(4, 64, (u, v) => Color.Lerp(bottom, top, v)));
 
         static float Frac(float x) => x - Mathf.Floor(x);

@@ -23,7 +23,7 @@ namespace CatMart
             if (_builtForHeight == Screen.height && _label != null) return;
             _builtForHeight = Screen.height;
 
-            _bg = Tex(new Color(0.08f, 0.09f, 0.12f, 0.82f));
+            _bg = ArtStyle.Cozy ? Rounded(new Color(0.36f, 0.26f, 0.19f, 0.9f)) : Tex(new Color(0.08f, 0.09f, 0.12f, 0.82f));
             _bgLight = Tex(new Color(1f, 0.98f, 0.94f, 0.95f));
             _white = Tex(Color.white);
             var font = Fonts.Main;
@@ -42,11 +42,34 @@ namespace CatMart
             _mono.normal.textColor = new Color(0.15f, 0.15f, 0.2f);
             _panel = new GUIStyle { padding = new RectOffset(S(18), S(18), S(14), S(14)) };
             _panel.normal.background = _bg;
+            if (ArtStyle.Cozy) _panel.border = new RectOffset(14, 14, 14, 14);
             _button = new GUIStyle { font = font, fontSize = S(26), alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
-            _button.normal.background = Tex(Orange);
-            _button.hover.background = Tex(Color.Lerp(Orange, Color.white, 0.2f));
-            _button.active.background = Tex(Color.Lerp(Orange, Color.black, 0.2f));
+            Color btn = ArtStyle.Cozy ? U.Hex("#F7A440") : Orange;
+            _button.normal.background = ArtStyle.Cozy ? Rounded(btn) : Tex(btn);
+            if (ArtStyle.Cozy) _button.border = new RectOffset(14, 14, 14, 14);
+            _button.hover.background = ArtStyle.Cozy ? Rounded(Color.Lerp(btn, Color.white, 0.2f)) : Tex(Color.Lerp(btn, Color.white, 0.2f));
+            _button.active.background = ArtStyle.Cozy ? Rounded(Color.Lerp(btn, Color.black, 0.15f)) : Tex(Color.Lerp(btn, Color.black, 0.2f));
             _button.normal.textColor = _button.hover.textColor = _button.active.textColor = Color.white;
+        }
+
+        /// <summary>圆角矩形贴图（配合 GUIStyle.border 做九宫格拉伸）。</summary>
+        static Texture2D Rounded(Color c, int size = 48, float radius = 14)
+        {
+            var t = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            var px = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float dx = Mathf.Max(0, Mathf.Max(radius - x - 0.5f, x + 0.5f - (size - radius)));
+                float dy = Mathf.Max(0, Mathf.Max(radius - y - 0.5f, y + 0.5f - (size - radius)));
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                var col = c;
+                col.a *= Mathf.Clamp01(radius - d + 0.5f);
+                px[y * size + x] = col;
+            }
+            t.SetPixels(px);
+            t.Apply();
+            return t;
         }
 
         static Texture2D Tex(Color c)
@@ -97,6 +120,8 @@ namespace CatMart
             GUILayout.BeginHorizontal();
             GUILayout.Label($"第 {G.Day} 天   钱包 {U.Money(G.Money)}", _label);
             GUILayout.FlexibleSpace();
+            if (GUILayout.Button($"画风：{ArtStyle.Name}", _button, GUILayout.Width(S(220)), GUILayout.Height(S(56)))) ArtStyle.Toggle();
+            GUILayout.Space(S(12));
             if (G.Day > 1 || G.Money != 0)
                 if (GUILayout.Button("重置存档", _button, GUILayout.Width(S(160)), GUILayout.Height(S(56)))) G.ResetProgress();
             GUILayout.Space(S(12));

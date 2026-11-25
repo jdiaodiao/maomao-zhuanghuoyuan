@@ -20,6 +20,7 @@ namespace CatMart
             foreach (var c in FindObjectsByType<Camera>()) Destroy(c.gameObject);
             foreach (var l in FindObjectsByType<Light>()) Destroy(l.gameObject);
 
+            Shapes.ApplyStyle();
             Sfx.Init(gameObject);
             gameObject.AddComponent<BgmPlayer>();
 
@@ -45,6 +46,11 @@ namespace CatMart
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.9f, 0.9f, 0.88f);
             camGo.AddComponent<AudioListener>();
+            if (ArtStyle.Cozy)
+            {
+                cam.backgroundColor = new Color(1f, 0.95f, 0.88f);
+                camGo.AddComponent<CozyPost>();
+            }
 
             var pc = player.AddComponent<PlayerController>();
             pc.Cam = cam;

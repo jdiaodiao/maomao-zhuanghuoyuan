@@ -108,6 +108,8 @@ namespace CatMart
             if (sub.Length == 0) sub = d.Mass >= 1 ? $"净含量 {d.Mass:0.#}kg" : $"净含量 {d.Mass * 1000:0}g";
 
             var brands = Brands[d.Category];
+            main = ArtStyle.Pastel(main);
+            accent = ArtStyle.Pastel(accent);
             return new LabelStyle
             {
                 Brand = brands[seed % brands.Length],

@@ -20,6 +20,7 @@ namespace CatMart
         public static readonly Color Pad = U.Hex("#F4A0B4");
 
         static MB[] _mesh;
+        public static void ClearCache() => _mesh = null;
 
         static Texture2D Tabby => TexGen.Get("tabby", () => TexGen.Make(256, 256, (u, v) =>
         {
@@ -76,6 +77,7 @@ namespace CatMart
             v.Add(regions[1], Mats.Lit(Sock, 0.22f, 0, TexGen.Fur, TexGen.FurN, 0.7f));
             v.Add(regions[2], Mats.Lit(Pad, 0.55f, 0));
             var go = v.Spawn(parent, side < 0 ? "左爪" : "右爪");
+            if (ArtStyle.Cozy) go.transform.localScale = Vector3.one * 1.15f;   // 森友会风：更胖乎乎
             go.transform.localRotation = Quaternion.Euler(15, side * -8f, 0);
             go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             return go.transform;

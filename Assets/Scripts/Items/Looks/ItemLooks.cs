@@ -16,6 +16,8 @@ namespace CatMart
         static readonly Dictionary<string, Result> Cache = new Dictionary<string, Result>();
         static readonly Dictionary<string, Action<LookCtx>> B = new Dictionary<string, Action<LookCtx>>();
 
+        public static void ClearCache() => Cache.Clear();
+
         public static Result Get(ItemDefinition def)
         {
             if (Cache.TryGetValue(def.Id, out var r)) return r;

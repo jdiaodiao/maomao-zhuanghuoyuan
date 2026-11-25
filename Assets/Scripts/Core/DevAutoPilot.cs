@@ -211,6 +211,13 @@ namespace CatMart
             g.Store.Customer.gameObject.SetActive(true);
             yield return new WaitForSeconds(0.2f);
             yield return Shot("7_store");
+            // 顾客猫特写（换一个橘色看看效果）
+            g.Store.Customer.SetFur(U.Hex("#E8923A"));
+            var head = g.Store.Customer.Head.position;
+            g.Player.Cam.transform.position = head + new Vector3(0.0f, -0.05f, -0.85f);
+            g.Player.Cam.transform.LookAt(head + new Vector3(0, -0.15f, 0));
+            yield return new WaitForSeconds(0.2f);
+            yield return Shot("8_cat");
 
             Log("自动测试完成");
             Application.Quit();

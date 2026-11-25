@@ -16,6 +16,7 @@ namespace CatMart
         static Material FilmMat => Mats.Glass(new Color(0.97f, 0.98f, 1f), 0.62f, 0.55f, TexGen.PlasticWrinkleN);
 
         static readonly Dictionary<string, (Mesh, Material[])> Cache = new Dictionary<string, (Mesh, Material[])>();
+        public static void ClearCache() => Cache.Clear();
 
         /// <summary>生成袋子，position 为袋底中心。</summary>
         public static Bag Create(BagSpec spec, Vector3 position, Quaternion rotation)

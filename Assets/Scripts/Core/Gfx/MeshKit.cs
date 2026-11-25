@@ -165,11 +165,17 @@ namespace CatMart
         /// 圆角盒。uvMap(face, local01) → 贴图 UV；默认每面铺满 0~1。
         /// 侧面文字方向保证从外面看是正的。
         /// </summary>
+        /// <summary>森友会风：圆角至少为最短半边长的这个比例（更圆润 Q 弹）。写实风为 0。</summary>
+        public static float MinRoundFrac;
+        public static void ApplyStyle() => MinRoundFrac = ArtStyle.Cozy ? 0.22f : 0f;
+
         public static MB RoundedBox(Vector3 size, float r, int bevelSeg = 3, int inner = 3, Func<Face, Vector2, Vector2> uvMap = null)
         {
             var mb = new MB();
             Vector3 h = size * 0.5f;
-            r = Mathf.Clamp(r, 0.0005f, Mathf.Min(h.x, Mathf.Min(h.y, h.z)) * 0.98f);
+            float minHalf = Mathf.Min(h.x, Mathf.Min(h.y, h.z));
+            if (MinRoundFrac > 0) { r = Mathf.Max(r, minHalf * MinRoundFrac); bevelSeg = Mathf.Max(bevelSeg, 4); }
+            r = Mathf.Clamp(r, 0.0005f, minHalf * 0.98f);
             float[] cx = Coords(h.x, r, bevelSeg, inner), cy = Coords(h.y, r, bevelSeg, inner), cz = Coords(h.z, r, bevelSeg, inner);
             Vector3 innerH = h - Vector3.one * r;
 

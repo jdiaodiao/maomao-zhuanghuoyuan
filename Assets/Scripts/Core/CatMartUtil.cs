@@ -74,6 +74,7 @@ namespace CatMart
 
         public static Material New(Color c, float smooth = 0.25f)
         {
+            if (ArtStyle.Cozy) return CozyNew("CozyMat", ArtStyle.Pastel(c), null, 0, smooth * 0.4f, Vector2.one);
             var m = new Material(Template) { color = c };
             if (m.HasProperty("_Glossiness")) m.SetFloat("_Glossiness", smooth);
             if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smooth);
@@ -90,6 +91,12 @@ namespace CatMart
 
         public static Material Emissive(Color c, Color emission)
         {
+            if (ArtStyle.Cozy)
+            {
+                var cm = CozyNew("CozyMat", ArtStyle.Pastel(c), null, 0, 0.3f, Vector2.one);
+                cm.SetColor("_EmissionColor", emission * 0.85f);
+                return cm;
+            }
             var res = Resources.Load<Material>("CatMart/EmissiveMat");
             var m = res != null ? new Material(res) { color = c } : New(c, 0.5f);
             if (m.HasProperty("_EmissionColor"))
@@ -123,6 +130,15 @@ namespace CatMart
             string key = K("lit", Col(c), smooth.ToString("0.00"), metallic.ToString("0.00"), albedo ? albedo.GetInstanceIDSafe() : 0,
                 normal ? normal.GetInstanceIDSafe() : 0, bump.ToString("0.0"), tile.x.ToString("0.00"), tile.y.ToString("0.00"));
             if (Named.TryGetValue(key, out var m) && m != null) return m;
+            if (ArtStyle.Cozy)
+            {
+                // 卡通风：不用法线贴图；灰度细节贴图只保留一点点，彩色贴图（果皮、面包等）保留颜色
+                bool colorTex = albedo != null && c.r > 0.95f && c.g > 0.95f && c.b > 0.95f;
+                float detail = albedo == null ? 0 : colorTex ? 0.85f : 0.3f;
+                m = CozyNew("CozyMat", colorTex ? c : ArtStyle.Pastel(c), albedo, detail, smooth * 0.45f + metallic * 0.25f, tile);
+                Named[key] = m;
+                return m;
+            }
             m = new Material(Tpl(normal != null ? "NormalMat" : "BaseMat")) { color = c };
             m.SetFloat("_Glossiness", smooth);
             m.SetFloat("_Metallic", metallic);
@@ -143,6 +159,14 @@ namespace CatMart
         {
             string key = K("glass", Col(tint), alpha.ToString("0.00"), smooth.ToString("0.00"), normal ? normal.GetInstanceIDSafe() : 0, bump.ToString("0.00"));
             if (Named.TryGetValue(key, out var m) && m != null) return m;
+            if (ArtStyle.Cozy)
+            {
+                var pc = ArtStyle.Pastel(tint);
+                pc.a = Mathf.Clamp01(alpha * 1.15f + 0.05f);
+                m = CozyNew("CozyTransparentMat", pc, null, 0, 0.7f, Vector2.one);
+                Named[key] = m;
+                return m;
+            }
             tint.a = alpha;
             m = new Material(Tpl(normal != null ? "GlassNormalMat" : "GlassMat")) { color = tint };
             m.SetFloat("_Glossiness", smooth);
@@ -157,6 +181,13 @@ namespace CatMart
         {
             string key = K("cut", Col(c), alphaTex.GetInstanceIDSafe(), tiling ?? Vector2.one);
             if (Named.TryGetValue(key, out var m) && m != null) return m;
+            if (ArtStyle.Cozy)
+            {
+                m = CozyNew("CozyCutoutMat", ArtStyle.Pastel(c), alphaTex, 0, 0.1f, tiling ?? Vector2.one);
+                m.SetFloat("_Cutoff", cutoff);
+                Named[key] = m;
+                return m;
+            }
             m = new Material(Tpl("CutoutMat")) { color = c, mainTexture = alphaTex };
             m.SetFloat("_Cutoff", cutoff);
             m.mainTextureScale = tiling ?? Vector2.one;
@@ -167,6 +198,7 @@ namespace CatMart
         /// <summary>贴图标签材质（每件商品独有）。</summary>
         public static Material Label(Texture tex, float smooth = 0.35f, float metallic = 0f)
         {
+            if (ArtStyle.Cozy) return CozyNew("CozyMat", Color.white, tex, 1f, smooth * 0.4f, Vector2.one);
             var m = new Material(Tpl("BaseMat")) { color = Color.white, mainTexture = tex };
             m.SetFloat("_Glossiness", smooth);
             m.SetFloat("_Metallic", metallic);
@@ -196,6 +228,26 @@ namespace CatMart
         }
 
         static string Col(Color c) => ColorUtility.ToHtmlStringRGBA(c);
+
+        // ---------------------------------------------------------------- 森友会风
+        static Material CozyNew(string tpl, Color c, Texture tex, float detail, float gloss, Vector2 tile)
+        {
+            var m = new Material(Tpl(tpl)) { color = c };
+            if (tex != null) m.mainTexture = tex;
+            if (m.HasProperty("_Detail")) m.SetFloat("_Detail", tex != null ? detail : 0f);
+            if (m.HasProperty("_Gloss")) m.SetFloat("_Gloss", Mathf.Clamp01(gloss));
+            m.mainTextureScale = tile;
+            return m;
+        }
+
+        /// <summary>切换画风时清空所有材质缓存。</summary>
+        public static void ClearCache()
+        {
+            Cache.Clear();
+            Named.Clear();
+            Templates.Clear();
+            _template = null;
+        }
     }
 
     public static class ObjIdExt
@@ -215,17 +267,47 @@ namespace CatMart
     public static class Fonts
     {
         static Font _main;
+        static Material _world;
+        static bool _hooked;
+        public static void ClearCache() { _main = null; _world = null; }
+
+        /// <summary>场景里的 3D 文字材质：开启深度测试，不会透过物体显示。</summary>
+        public static Material WorldMaterial
+        {
+            get
+            {
+                if (_world == null)
+                {
+                    var tpl = Resources.Load<Material>("CatMart/WorldTextMat");
+                    _world = tpl != null ? new Material(tpl) : new Material(Main.material);
+                    _world.color = Color.white;
+                    if (!_hooked)
+                    {
+                        // 动态字体图集重建时，同步贴图（所有 3D 文字共用这个材质）
+                        Font.textureRebuilt += f => { if (_world != null && f == _main) _world.mainTexture = f.material.mainTexture; };
+                        _hooked = true;
+                    }
+                }
+                _world.mainTexture = Main.material.mainTexture;
+                return _world;
+            }
+        }
         public static Font Main
         {
             get
             {
                 if (_main == null)
                 {
-                    _main = Font.CreateDynamicFontFromOSFont(new[]
+                    // 森友会风：用打包进游戏的开源圆润字体「站酷快乐体」（OFL），缺字时由系统字体补
+                    if (ArtStyle.Cozy)
                     {
-                        "Microsoft YaHei UI", "Microsoft YaHei", "SimHei", "PingFang SC",
-                        "Hiragino Sans GB", "Noto Sans CJK SC", "Arial"
-                    }, 64);
+                        var bundled = Resources.Load<Font>("Fonts/ZCOOLKuaiLe/ZCOOLKuaiLe-Regular");
+                        if (bundled != null) { _main = bundled; return _main; }
+                    }
+                    var names = ArtStyle.Cozy
+                        ? new[] { "YouYuan", "幼圆", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "Arial Rounded MT Bold", "Arial" }
+                        : new[] { "Microsoft YaHei UI", "Microsoft YaHei", "SimHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Arial" };
+                    _main = Font.CreateDynamicFontFromOSFont(names, 64);
                 }
                 return _main;
             }
@@ -259,7 +341,7 @@ namespace CatMart
                 ? TextAlignment.Left : TextAlignment.Center;
             tm.color = color;
             tm.text = text;
-            go.GetComponent<MeshRenderer>().sharedMaterial = Fonts.Main.material;
+            go.GetComponent<MeshRenderer>().sharedMaterial = Fonts.WorldMaterial;
             return tm;
         }
     }

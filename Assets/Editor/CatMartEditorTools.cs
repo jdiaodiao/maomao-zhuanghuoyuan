@@ -66,6 +66,12 @@ namespace CatMart.EditorTools
             // 无光照（包装贴图烘焙用）
             Create("UnlitColorMat", Shader.Find("Unlit/Color"), null);
             Create("UnlitTexMat", Shader.Find("Unlit/Texture"), null);
+            // 森友会风卡通着色 + 后期
+            Create("CozyMat", Shader.Find("CatMart/CozyToon"), null);
+            Create("CozyTransparentMat", Shader.Find("CatMart/CozyToonTransparent"), null);
+            Create("CozyCutoutMat", Shader.Find("CatMart/CozyToonCutout"), null);
+            Create("CozyPostMat", Shader.Find("Hidden/CatMart/CozyPost"), null);
+            Create("WorldTextMat", Shader.Find("CatMart/WorldText"), null);
             AssetDatabase.SaveAssets();
         }
 

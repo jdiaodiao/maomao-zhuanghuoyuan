@@ -48,9 +48,9 @@ namespace CatMart
         static Material SteelTop => Mats.Lit(U.Hex("#C9CED3"), 0.74f, 0.9f, TexGen.BrushedSteel, TexGen.BrushedSteelN, 0.1f, new Vector2(6, 2));
         static Material SteelSatin => Mats.Lit(U.Hex("#B7BDC3"), 0.6f, 0.85f, TexGen.BrushedSteel, TexGen.BrushedSteelN, 0.1f, new Vector2(2, 4));
         static Material Chrome => Mats.Lit(U.Hex("#D9DDE2"), 0.9f, 1f);
-        static Material Laminate => Mats.Lit(U.Hex("#EEE8DC"), 0.38f, 0, TexGen.Speckle, null, 1, new Vector2(4, 4));
-        static Material WoodPanel => Mats.Lit(U.Hex("#E9D6B4"), 0.42f, 0, TexGen.Wood, null, 1, new Vector2(12, 2));
-        static Material Kick => Mats.Lit(U.Hex("#2B2F36"), 0.35f, 0.2f);
+        static Material Laminate => ArtStyle.Cozy ? Mats.Lit(U.Hex("#FFF6E8"), 0.3f) : Mats.Lit(U.Hex("#EEE8DC"), 0.38f, 0, TexGen.Speckle, null, 1, new Vector2(4, 4));
+        static Material WoodPanel => ArtStyle.Cozy ? Mats.Lit(U.Hex("#A9DCC9"), 0.3f) : Mats.Lit(U.Hex("#E9D6B4"), 0.42f, 0, TexGen.Wood, null, 1, new Vector2(12, 2));
+        static Material Kick => ArtStyle.Cozy ? Mats.Lit(U.Hex("#8A6A55"), 0.3f) : Mats.Lit(U.Hex("#2B2F36"), 0.35f, 0.2f);
         static Material DarkPlastic => Mats.Lit(U.Hex("#2A2D33"), 0.55f, 0);
         static Material OrangeGloss => Mats.Lit(Orange, 0.55f, 0);
         static Material NavyGloss => Mats.Lit(Navy, 0.5f, 0);
@@ -93,14 +93,16 @@ namespace CatMart
         {
             var v = new VisualSet();
             // 抛光地砖
-            var floorMat = Mats.Lit(Color.white, 0.62f, 0, TexGen.FloorTile, TexGen.FloorTileN, 0.5f, new Vector2(18 / 1.2f, 14 / 1.2f));
+            var floorMat = ArtStyle.Cozy
+                ? Mats.Lit(Color.white, 0.35f, 0, TexGen.WoodPlanks, null, 1, new Vector2(18 / 2.4f, 14 / 2.4f))
+                : Mats.Lit(Color.white, 0.62f, 0, TexGen.FloorTile, TexGen.FloorTileN, 0.5f, new Vector2(18 / 1.2f, 14 / 1.2f));
             var floor = Shapes.Quad(18, 14, 18, 14);
             v.Add(floor, new Vector3(0, 0, 1), Quaternion.Euler(90, 0, 0), floorMat);
             Col(root, new Vector3(0, -0.05f, 1), new Vector3(18, 0.1f, 14), "地板");
 
             // 墙：上部乳胶漆 + 下部护墙板 + 橙色腰线
-            var wall = Mats.Lit(U.Hex("#F3EEE4"), 0.15f, 0, TexGen.Speckle, null, 1, new Vector2(8, 2));
-            var wains = Mats.Lit(U.Hex("#2F3B4C"), 0.45f, 0);
+            var wall = ArtStyle.Cozy ? Mats.Lit(U.Hex("#FFF2DC"), 0.1f) : Mats.Lit(U.Hex("#F3EEE4"), 0.15f, 0, TexGen.Speckle, null, 1, new Vector2(8, 2));
+            var wains = ArtStyle.Cozy ? Mats.Lit(U.Hex("#9ED6C2"), 0.3f) : Mats.Lit(U.Hex("#2F3B4C"), 0.45f, 0);
             void Wall(Vector3 c, float w, float rotY)
             {
                 var q = Quaternion.Euler(0, rotY, 0);
@@ -674,6 +676,29 @@ namespace CatMart
             spot.shadows = LightShadows.Soft;
             spot.shadowStrength = 0.55f;
             spot.color = new Color(1f, 0.97f, 0.93f);
+
+            if (ArtStyle.Cozy)
+            {
+                // 森友会风：明亮、温暖、阴影柔和偏淡
+                // 卡通光影的受光面是"整面全亮"，所以总亮度要比写实风低不少
+                RenderSettings.ambientSkyColor = new Color(0.40f, 0.40f, 0.44f);
+                RenderSettings.ambientEquatorColor = new Color(0.36f, 0.33f, 0.32f);
+                RenderSettings.ambientGroundColor = new Color(0.26f, 0.23f, 0.23f);
+                RenderSettings.fogColor = new Color(0.95f, 0.91f, 0.86f);
+                RenderSettings.fogStartDistance = 12f;
+                RenderSettings.fogEndDistance = 40f;
+                sun.intensity = 0.62f;
+                sun.color = new Color(1f, 0.93f, 0.83f);
+                sun.shadowStrength = 0.5f;
+                sun.transform.rotation = Quaternion.Euler(52, 35, 0);
+                spot.intensity = 0.12f;
+                spot.shadowStrength = 0.3f;
+                spot.color = new Color(1f, 0.92f, 0.8f);
+                probe.backgroundColor = new Color(0.8f, 0.75f, 0.68f);
+                probe.intensity = 0.35f;
+                foreach (var l in root.GetComponentsInChildren<Light>())
+                    if (l.type == LightType.Point) { l.intensity = 0.1f; l.color = new Color(1f, 0.9f, 0.78f); }
+            }
         }
     }
 }
