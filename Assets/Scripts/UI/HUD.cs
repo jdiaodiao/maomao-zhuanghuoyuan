@@ -155,7 +155,7 @@ namespace CatMart
                 string bal = s.Count == 0 ? "-" : $"{s.Imbalance * 100:0}%";
                 string col = s.Imbalance <= 0.15f ? "#7CFC9A" : s.Imbalance <= 0.35f ? "#F2C14E" : "#FF6B5B";
                 string kg = s.Overweight ? $"<color=#FF6B5B>{s.Mass:0.0}/{b.Spec.CapacityKg}kg</color>" : $"{s.Mass:0.0}/{b.Spec.CapacityKg}kg";
-                sb.AppendLine($"{i + 1}号 {b.Spec.Name} {s.Count}件 {kg} 偏心 <color={col}>{bal}</color>" + (b.Torn ? " <color=#FF6B5B>破</color>" : ""));
+                sb.AppendLine($"{i + 1}号 {b.Spec.Name} {s.Count}件 {kg} 偏心 <color={col}>{bal}</color>" + (s.Unstable > 0 ? $" <color=#FFB347>高出{s.Unstable}</color>" : "") + (b.Torn ? " <color=#FF6B5B>破</color>" : ""));
             }
             var rp = new Rect(Screen.width - S(470), S(16), S(454), S(186));
             GUILayout.BeginArea(rp, _panel);
@@ -222,6 +222,7 @@ namespace CatMart
                 if (d.Bulky) sb.Append("  <color=#9EC9FF>大件→推车</color>");
                 float maxLoad = it.Parts.Count > 0 ? it.Parts.Max(p => p.LoadRatio) : 0;
                 if (it.IsDamaged) sb.Append("\n<color=#FF6B5B>已损坏</color>");
+                else if (P.Held == null && G.Slots.Any(bg => bg != null && bg.Contains(it) && bg.AboveRim(it))) sb.Append("\n<color=#FFB347>质心高出袋口，不稳！</color>");
                 else if (maxLoad > 0.3f) sb.Append($"\n<color={(maxLoad > 0.8f ? "#FF6B5B" : "#F2C14E")}>受压 {maxLoad * 100:0}%</color>");
                 if (P.Held != null) sb.Append("\n<color=#AAAAAA>Q/E R/F 旋转 · C 侧放 · Z 回正 · 滚轮远近</color>");
                 text = sb.ToString();

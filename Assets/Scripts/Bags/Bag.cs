@@ -89,7 +89,11 @@ namespace CatMart
             public Vector3 LocalCom;
             public float Imbalance; // 0 = 完美居中，1 = 重心在袋边
             public bool Overweight;
+            public int Unstable;    // 质心高出袋口的件数
         }
+
+        /// <summary>商品质心是否高出袋口（放得不稳）。</summary>
+        public bool AboveRim(GroceryItem it) => transform.InverseTransformPoint(it.WorldCom).y > Spec.Inner.y;
 
         public Stats Compute()
         {
@@ -99,7 +103,9 @@ namespace CatMart
             {
                 s.Count++;
                 s.Mass += it.Def.Mass;
-                sum += transform.InverseTransformPoint(it.WorldCom) * it.Def.Mass;
+                Vector3 local = transform.InverseTransformPoint(it.WorldCom);
+                sum += local * it.Def.Mass;
+                if (local.y > Spec.Inner.y) s.Unstable++;
             }
             if (s.Mass > 0)
             {

@@ -13,6 +13,7 @@ namespace CatMart
         public float Imbalance;
         public bool Overweight;
         public bool Torn;
+        public int Unstable;
         public float Factor;
         public string Note;
     }
@@ -35,6 +36,8 @@ namespace CatMart
     public static class Settlement
     {
         public const float Commission = 0.10f;
+        /// <summary>每件质心高出袋口的商品，该袋系数 ×0.8，最低 ×0.4。</summary>
+        public const float UnstablePerItem = 0.8f, UnstableFloor = 0.4f;
 
         public static float BalanceFactor(float r)
         {
@@ -81,6 +84,13 @@ namespace CatMart
                 };
                 br.Factor = BalanceFactor(st.Imbalance);
                 br.Note = st.Imbalance <= 0.15f ? "重心完美" : st.Imbalance <= 0.3f ? "略有偏斜" : st.Imbalance <= 0.6f ? "一边重一边轻" : "严重偏重";
+                // 质心高出袋口的商品 → 提起来会晃、会掉，不稳
+                br.Unstable = st.Unstable;
+                if (st.Unstable > 0)
+                {
+                    br.Factor *= Mathf.Max(UnstableFloor, Mathf.Pow(UnstablePerItem, st.Unstable));
+                    br.Note += $"，{st.Unstable}件高出袋口不稳";
+                }
                 if (b.Torn) { br.Factor = Mathf.Min(br.Factor, 0.5f); br.Note = "袋子被刺破"; }
                 if (st.Overweight) { br.Factor = Mathf.Min(br.Factor, 0.4f); br.Note = $"超重 ({st.Mass:0.0}/{b.Spec.CapacityKg}kg) 提起时破了"; }
                 r.Bags.Add(br);

@@ -40,6 +40,10 @@ namespace CatMart
             vis.AddComponent<MeshFilter>().sharedMesh = look.Item1;
             vis.AddComponent<MeshRenderer>().sharedMaterials = look.Item2;
 
+            // 袋壁：每个袋子一份，可被内容物撑开
+            if (spec.Material == BagMaterial.Paper) BagWallDeformer.Create(t, spec, KraftMat, KraftInner);
+            else BagWallDeformer.Create(t, spec, FilmMat, FilmMat);
+
             // 碰撞（向外加厚，防穿透）
             Col(t, new Vector3(0, -col / 2, 0), new Vector3(w + col * 2, col, d + col * 2));
             Col(t, new Vector3(-(w + col) / 2, h / 2, 0), new Vector3(col, h, d + col * 2));
@@ -78,57 +82,7 @@ namespace CatMart
             float w = spec.Inner.x, h = spec.Inner.y, d = spec.Inner.z;
             float crease = d * 0.22f;
             var v = new VisualSet();
-            var outer = new MB();
-            float Zig(float x) => (Mathf.Abs((x * 250f) % 2f - 1f)) * 0.004f;
-
-            // 前后
-            for (int side = -1; side <= 1; side += 2)
-            {
-                int nx = Mathf.Max(8, (int)(w / 0.004f)), ny = 8;
-                int start = outer.V.Count;
-                for (int j = 0; j <= ny; j++)
-                for (int i = 0; i <= nx; i++)
-                {
-                    float x = (i / (float)nx - 0.5f) * w;
-                    float y = j / (float)ny * h;
-                    if (j == ny) y -= Zig(x);
-                    float bulge = Mathf.Sin(j / (float)ny * Mathf.PI) * 0.003f * (1 - Mathf.Pow(2 * x / w, 2));
-                    outer.Vert(new Vector3(x, y, side * (d / 2 + bulge)), new Vector2(x * 3, y * 3));
-                }
-                for (int j = 0; j < ny; j++)
-                for (int i = 0; i < nx; i++)
-                {
-                    int a = start + j * (nx + 1) + i, b = a + 1, c = a + nx + 2, dd = a + nx + 1;
-                    if (side < 0) outer.Quad(a, dd, c, b); else outer.Quad(a, b, c, dd);
-                }
-            }
-            // 两侧（向内折的风琴褶）
-            for (int side = -1; side <= 1; side += 2)
-            {
-                int nz = 12, ny = 8;
-                int start = outer.V.Count;
-                for (int j = 0; j <= ny; j++)
-                for (int k = 0; k <= nz; k++)
-                {
-                    float z = (k / (float)nz - 0.5f) * d;
-                    float y = j / (float)ny * h;
-                    if (j == ny) y -= Zig(z + 1);
-                    float fold = crease * (1 - Mathf.Abs(z) / (d / 2)) * Mathf.SmoothStep(0, 1, y / (h * 0.25f));
-                    outer.Vert(new Vector3(side * (w / 2 - fold), y, z), new Vector2(z * 3, y * 3));
-                }
-                for (int j = 0; j < ny; j++)
-                for (int k = 0; k < nz; k++)
-                {
-                    int a = start + j * (nz + 1) + k, b = a + 1, c = a + nz + 2, dd = a + nz + 1;
-                    if (side > 0) outer.Quad(a, dd, c, b); else outer.Quad(a, b, c, dd);
-                }
-            }
-            outer.Normals(false);
-            var inner = new MB();
-            for (int i = 0; i < outer.V.Count; i++) inner.Vert(outer.V[i] - outer.N[i] * 0.0006f, -outer.N[i], outer.UV[i]);
-            for (int i = 0; i < outer.T.Count; i += 3) { inner.T.Add(outer.T[i]); inner.T.Add(outer.T[i + 2]); inner.T.Add(outer.T[i + 1]); }
-            v.Add(outer, KraftMat);
-            v.Add(inner, KraftInner);
+            // 袋壁在 BagWallDeformer 里生成（会随内容物形变）
             // 底
             v.Add(Shapes.RoundedBox(new Vector3(w, 0.002f, d), 0.0008f, 1, 1, (f, l) => l * 2), new Vector3(0, 0.001f, 0), Quaternion.identity, KraftInner);
             // 印刷 logo（前后）
@@ -162,50 +116,6 @@ namespace CatMart
         {
             float w = spec.Inner.x, h = spec.Inner.y, d = spec.Inner.z;
             var v = new VisualSet();
-            var film = new MB();
-            int nx = 24, ny = 12, nz = 10;
-            float Wr(Vector3 p) => (Noise.Value3(p * 40f, 5) - 0.5f) * 0.006f + Mathf.Sin(p.y * 90f + p.x * 30f) * 0.0012f;
-            for (int side = -1; side <= 1; side += 2)
-            {
-                int start = film.V.Count;
-                for (int j = 0; j <= ny; j++)
-                for (int i = 0; i <= nx; i++)
-                {
-                    float x = (i / (float)nx - 0.5f) * w, y = j / (float)ny * h;
-                    float bulge = Mathf.Sin(Mathf.Clamp01(y / h) * Mathf.PI * 0.9f) * 0.008f * (1 - Mathf.Pow(2 * x / w, 2));
-                    var p = new Vector3(x, y, side * (d / 2 + bulge));
-                    p.z += side * Wr(p);
-                    film.Vert(p, new Vector2(x * 2, y * 2));
-                }
-                for (int j = 0; j < ny; j++)
-                for (int i = 0; i < nx; i++)
-                {
-                    int a = start + j * (nx + 1) + i, b = a + 1, c = a + nx + 2, dd = a + nx + 1;
-                    if (side < 0) film.Quad(a, dd, c, b); else film.Quad(a, b, c, dd);
-                }
-            }
-            for (int side = -1; side <= 1; side += 2)
-            {
-                int start = film.V.Count;
-                for (int j = 0; j <= ny; j++)
-                for (int k = 0; k <= nz; k++)
-                {
-                    float z = (k / (float)nz - 0.5f) * d, y = j / (float)ny * h;
-                    float fold = d * 0.18f * (1 - Mathf.Abs(z) / (d / 2)) * Mathf.SmoothStep(0, 1, y / (h * 0.4f));
-                    var p = new Vector3(side * (w / 2 - fold), y, z);
-                    p.x += side * Wr(p);
-                    film.Vert(p, new Vector2(z * 2, y * 2));
-                }
-                for (int j = 0; j < ny; j++)
-                for (int k = 0; k < nz; k++)
-                {
-                    int a = start + j * (nz + 1) + k, b = a + 1, c = a + nz + 2, dd = a + nz + 1;
-                    if (side > 0) film.Quad(a, dd, c, b); else film.Quad(a, b, c, dd);
-                }
-            }
-            film.Normals(false);
-            film.DoubleSided();
-            v.Add(film, FilmMat);
             v.Add(Shapes.Quad(w, d), new Vector3(0, 0.001f, 0), Quaternion.Euler(90, 0, 0), FilmMat);
 
             // 提手：两侧各一个扁环

@@ -75,6 +75,7 @@ namespace CatMart
             g.Player.SetTopView(true, false);
             g.Player.FocusSlot(0);
             yield return new WaitForSeconds(0.8f);
+            foreach (var bg in g.Slots) if (bg != null) { var df = bg.GetComponentInChildren<BagWallDeformer>(); var st2 = bg.Compute(); Log($"袋壁形变: {bg.Spec.Name} {st2.Count}件 最大外推 {df.MaxPush * 100:0.0}cm 高出袋口 {st2.Unstable}件"); }
             yield return Shot("2b_topview");
             // 轨迹测试：把放在袋子旁边台面上的麦片拿进 1 号袋（需要越过袋壁）
             var bag1 = g.Slots[0];
