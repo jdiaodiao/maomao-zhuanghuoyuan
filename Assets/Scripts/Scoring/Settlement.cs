@@ -27,6 +27,8 @@ namespace CatMart
         public bool ReqMatch;
         public string ReqNote;
         public int Missing;
+        public float TipFactor = 1f;
+        public List<string> TippedNames = new List<string>();
         public List<string> MissingNames = new List<string>();
         public List<string> DamagedNames = new List<string>();
         public List<BagResult> Bags = new List<BagResult>();
@@ -38,6 +40,8 @@ namespace CatMart
         public const float Commission = 0.10f;
         /// <summary>每件质心高出袋口的商品，该袋系数 ×0.8，最低 ×0.4。</summary>
         public const float UnstablePerItem = 0.8f, UnstableFloor = 0.4f;
+        /// <summary>每件翻倒的"不能倒"商品，总倍率 ×0.75，最低 ×0.4。</summary>
+        public const float TippedPerItem = 0.75f, TippedFloor = 0.4f;
 
         public static float BalanceFactor(float r)
         {
@@ -61,6 +65,7 @@ namespace CatMart
                 if (it == null) continue;
                 if (it.IsDamaged) { r.DamagePenalty += it.Def.Price; r.DamagedNames.Add(it.Def.Name); }
                 if (it.IsDestroyed) continue;
+                if (it.Tipped && !it.IsDamaged) r.TippedNames.Add(it.Def.Name);
 
                 Bag home = bags.FirstOrDefault(b => b.Contains(it));
                 if (home != null) { assigned[home].Add(it); continue; }
@@ -129,7 +134,9 @@ namespace CatMart
             r.PatienceFactor = patience01 >= 0.5f ? 1f : Mathf.Lerp(0.7f, 1f, patience01 / 0.5f);
             r.MissingFactor = Mathf.Pow(0.9f, r.Missing);
 
-            r.Multiplier = r.ReqFactor * r.BalanceFactor * r.PatienceFactor * r.MissingFactor;
+            r.TipFactor = r.TippedNames.Count == 0 ? 1f : Mathf.Max(TippedFloor, Mathf.Pow(TippedPerItem, r.TippedNames.Count));
+
+            r.Multiplier = r.ReqFactor * r.BalanceFactor * r.PatienceFactor * r.MissingFactor * r.TipFactor;
             r.Pay = r.BasePay * r.Multiplier;
             r.Net = r.Pay - r.DamagePenalty;
             r.Stars = r.Multiplier >= 1.4f ? 3 : r.Multiplier >= 1.0f ? 2 : r.Multiplier >= 0.6f ? 1 : 0;

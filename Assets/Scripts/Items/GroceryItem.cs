@@ -45,9 +45,30 @@ namespace CatMart
         /// <summary>手里拿着时给部件的近似最大尺寸。</summary>
         public float Radius => Def.Size.magnitude * 0.5f;
 
+        // ---------- 不能倒的商品 ----------
+        public const float TipWarnDeg = 25f, TipDeg = 50f, TipHold = 0.25f;
+        /// <summary>当前倾斜角（度），本地 +y 和竖直方向的夹角。</summary>
+        public float Tilt => Vector3.Angle(transform.up, Vector3.up);
+        /// <summary>不能倒的商品倒过（超过 50° 持续 0.25 秒）。倒了就是倒了，扶起来也不算。</summary>
+        public bool Tipped { get; private set; }
+        float _tipTimer;
+
+        void CheckTip(float dt)
+        {
+            if (!Def.Upright || Tipped || IsDestroyed) return;
+            if (Tilt < TipDeg) { _tipTimer = 0; return; }
+            _tipTimer += dt;
+            if (_tipTimer < TipHold) return;
+            Tipped = true;
+            FloatText.Spawn(WorldCom + Vector3.up * 0.12f, $"{Def.Name} 倒了!", new Color(1f, 0.42f, 0.3f), 0.035f);
+            Sfx.Play("rip", 0.5f);
+            if (GameManager.I != null) GameManager.I.OnItemTipped(this);
+        }
+
         void FixedUpdate()
         {
             float dt = Time.fixedDeltaTime;
+            if (_grace <= 0) CheckTip(dt);
             if (_grace > 0) { _grace -= dt; foreach (var p in Parts) p.ResetLoad(); return; }
             foreach (var p in Parts) p.Tick(dt);
         }

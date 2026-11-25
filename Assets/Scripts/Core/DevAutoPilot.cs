@@ -26,6 +26,13 @@ namespace CatMart
             g.ResetProgress();
             g.StartDay();
             var cam = g.Player.Cam;
+            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-onlyTip") >= 0)
+            {
+                yield return TipTest(g);
+                Log("自动测试完成");
+                Application.Quit();
+                yield break;
+            }
 
             // 等商品全部送到
             Time.timeScale = 2f;
@@ -173,6 +180,9 @@ namespace CatMart
             // 4b) 穿模测试：像玩家一样在俯视模式里把薄而大的零食一件件轻放进袋子
             yield return ClipTest(g);
 
+            // 4d) 不能倒 + 属性光边
+            yield return TipTest(g);
+
             // 5) 各商品外观总览
             g.NextCustomer();
             g.Store.Feeder.Stop();
@@ -221,6 +231,50 @@ namespace CatMart
 
             Log("自动测试完成");
             Application.Quit();
+        }
+
+        IEnumerator TipTest(GameManager g)
+        {
+            g.NextCustomer();
+            g.Store.Feeder.Stop();
+            foreach (var it in g.OrderItems) Destroy(it.gameObject);
+            g.OrderItems.Clear();
+            yield return null;
+            float top = Layout.CounterTop;
+            var upright = ItemFactory.Create(ItemCatalog.Get("cake"), new Vector3(-0.9f, top + 0.07f, 0.05f), Quaternion.identity);
+            var fallen = ItemFactory.Create(ItemCatalog.Get("cake"), new Vector3(-0.55f, top + 0.13f, 0.05f), Quaternion.Euler(0, 0, 90));
+            var vase = ItemFactory.Create(ItemCatalog.Get("flower_vase"), new Vector3(-0.2f, top + 0.17f, 0.05f), Quaternion.identity);
+            yield return new WaitForSeconds(1.2f);
+            Log($"翻倒测试: 立着的蛋糕 tipped={upright.Tipped} (期望 False); 侧放的蛋糕 tipped={fallen.Tipped} (期望 True); 插花 tipped={vase.Tipped} 倾斜{vase.Tilt:0}° damaged={vase.IsDamaged} (期望 False/False)");
+            // 推倒插花
+            vase.Rb.AddForceAtPosition(new Vector3(0, 0, 3.5f), vase.transform.position + Vector3.up * 0.15f, ForceMode.Impulse);
+            yield return new WaitForSeconds(1.5f);
+            Log($"翻倒测试: 推倒插花 tipped={vase.Tipped} damaged={vase.IsDamaged} (期望 tipped=True)");
+            foreach (var it in new[] { upright, fallen, vase }) if (it != null) Destroy(it.gameObject);
+            yield return null;
+
+            // 属性光边特写：各种属性的商品摆一排
+            string[] ids = { "rice", "chips", "wine", "skewers", "cake", "flower_vase", "soda_12", "eggs" };
+            var shown = new List<GroceryItem>();
+            for (int k = 0; k < ids.Length; k++)
+            {
+                var d = ItemCatalog.Get(ids[k]);
+                var p = new Vector3(-1.05f + k * 0.29f, top + d.Size.y / 2 + 0.002f, k % 2 == 0 ? 0.02f : 0.2f);
+                var it = ItemFactory.Create(d, p, Quaternion.Euler(0, (k - 4) * 3, 0));
+                it.Rb.isKinematic = true;
+                shown.Add(it);
+            }
+            g.Player.enabled = false;
+            g.Player.Paws.gameObject.SetActive(false);
+            g.Player.Cam.transform.position = new Vector3(0.0f, top + 0.55f, -0.62f);
+            g.Player.Cam.transform.rotation = Quaternion.Euler(30, -8, 0);
+            for (float t = 0; t < 1.6f; t += Time.deltaTime) yield return null;
+            yield return Shot("9_outlines");
+            yield return new WaitForSeconds(0.55f);
+            yield return Shot("9b_outlines");
+            foreach (var it in shown) Destroy(it.gameObject);
+            g.Player.Paws.gameObject.SetActive(true);
+            yield return null;
         }
 
         IEnumerator ReachTest(GameManager g)
@@ -380,6 +434,7 @@ namespace CatMart
             float h = s.y, bestScore = float.MaxValue;
             foreach (var e in eulers)
             {
+                if (it.Def.Upright && e.x + e.z != 0) continue;   // 不能倒的只能立着放
                 var q = Quaternion.Euler(e);
                 Vector3 r = new Vector3(
                     Mathf.Abs((q * Vector3.right).x) * s.x + Mathf.Abs((q * Vector3.up).x) * s.y + Mathf.Abs((q * Vector3.forward).x) * s.z,

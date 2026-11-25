@@ -112,7 +112,9 @@ namespace CatMart
                 "请按顾客的要求，用指定数量和尺寸的<b>塑料袋</b>或<b>纸袋</b>把商品装好。\n\n" +
                 "<color=#F2C14E>评分</color>：袋子里的<b>重心要居中</b>（不能一边重一边轻）、袋子<b>规格要对</b>、" +
                 "<b>不能压坏</b>商品（压坏要按原价赔！）。尖锐的东西会扎破塑料袋和软商品，玻璃瓶和鸡蛋摔不得。" +
-                "大件（整箱水、猫砂…）直接放顾客的购物车。\n\n" +
+                "大件（整箱水、猫砂…）直接放顾客的购物车。" +
+                "<color=#5FE08A>不能倒</color>的东西（蛋糕、插花…）要一直立着，倒了扣分。商品外侧的光边提示它的属性：" +
+                "白=普通 <color=#FFD84D>黄=怕压</color> <color=#FF7FB6>粉=易摔碎</color> <color=#FF8A3D>橙=尖锐</color> <color=#6FC3FF>蓝=大件</color> <color=#5FE08A>绿=不能倒</color>（多种属性会轮流变色）。\n\n" +
                 $"每天接待 {GameManager.CustomersPerDay} 位顾客，工钱 = 订单总价 × 10% × 评分倍率 − 赔偿。", _label);
             GUILayout.Space(S(10));
             GUILayout.Label(ControlsText(), _small);
@@ -157,7 +159,7 @@ namespace CatMart
             var rr = new Rect(S(16), S(120), w, S(118));
             GUILayout.BeginArea(rr, _panel);
             GUILayout.Label($"<b>{o.CustomerName}</b> 的要求：<color=#F2C14E><b>{o.BagRequestText}</b></color>" +
-                            (o.Items.Any(i => i.Bulky) ? "  <color=#9EC9FF>（大件放推车）</color>" : ""), _label);
+                            (o.Items.Any(i => i.Bulky) ? "  <color=#6FC3FF>（大件放推车）</color>" : ""), _label);
             GUILayout.Label($"订单 {o.Items.Count} 件 · 总价 {U.Money(o.ItemsTotal)} · 基础工钱 {U.Money(o.ItemsTotal * Settlement.Commission)}", _small);
             GUILayout.EndArea();
             var bar = new Rect(rr.x + S(18), rr.yMax - S(26), w - S(36), S(12));
@@ -242,9 +244,9 @@ namespace CatMart
                 var d = it.Def;
                 var sb = new StringBuilder();
                 sb.Append($"<b>{d.Name}</b>  <color=#AAAAAA>{d.CategoryName}</color>\n");
-                sb.Append($"{U.Money(d.Price)} · {d.Mass:0.00} kg · <color=#F2C14E>{d.FragilityText}</color>");
-                if (d.MaxSharp >= 0.3f) sb.Append("  <color=#FF8A65>尖锐!</color>");
-                if (d.Bulky) sb.Append("  <color=#9EC9FF>大件→推车</color>");
+                sb.Append($"{U.Money(d.Price)} · {d.Mass:0.00} kg");
+                // 属性说明（颜色和商品光边一致）；靠记忆的关卡不显示
+                if (G.TraitHints) sb.Append(" · " + ItemTraits.RichText(d));
                 float maxLoad = it.Parts.Count > 0 ? it.Parts.Max(p => p.LoadRatio) : 0;
                 if (it.IsDamaged) sb.Append("\n<color=#FF6B5B>已损坏</color>");
                 else if (P.Held == null && G.Slots.Any(bg => bg != null && bg.Contains(it) && bg.AboveRim(it))) sb.Append("\n<color=#FFB347>质心高出袋口，不稳！</color>");
@@ -263,7 +265,7 @@ namespace CatMart
             {
                 var s = P.LookRack.Spec;
                 text = $"<b>{s.Name}</b>（点击取一个）\n内尺寸 {s.Inner.x * 100:0}×{s.Inner.y * 100:0}×{s.Inner.z * 100:0} cm · 承重 {s.CapacityKg} kg" +
-                       (s.Material == BagMaterial.Plastic ? "\n<color=#FF8A65>怕尖锐物品</color>" : "\n<color=#AAAAAA>耐扎，但不能超重</color>");
+                       (s.Material == BagMaterial.Plastic ? "\n<color=#FF8A3D>怕尖锐物品</color>" : "\n<color=#AAAAAA>耐扎，但不能超重</color>");
             }
             else if (P.LookBell)
             {
@@ -316,6 +318,8 @@ namespace CatMart
             }
             sb.AppendLine($"耐心系数  ×{res.PatienceFactor:0.00}");
             sb.AppendLine($"漏装系数  ×{res.MissingFactor:0.00}" + (res.Missing > 0 ? $"   <color=#FF6B5B>漏装 {res.Missing} 件: {string.Join("、", res.MissingNames.Take(4))}</color>" : ""));
+            if (res.TippedNames.Count > 0)
+                sb.AppendLine($"翻倒系数  ×{res.TipFactor:0.00}   <color=#FF6B5B>倒了 {res.TippedNames.Count} 件: {string.Join("、", res.TippedNames.Take(4))}</color>");
             sb.AppendLine();
             sb.AppendLine($"总倍率 <b>×{res.Multiplier:0.00}</b>  →  工钱 <color=#7CFC9A><b>{U.Money(res.Pay)}</b></color>");
             if (res.DamagedNames.Count > 0)

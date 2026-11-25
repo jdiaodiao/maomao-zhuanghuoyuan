@@ -699,6 +699,54 @@ namespace CatMart
                 var s = c.S(0);
                 c.V(0).Add(Shapes.RoundedBox(new Vector3(s.x * 0.98f, 0.003f, 0.002f), 0.0005f, 1, 1), new Vector3(0, s.y * 0.35f, -s.z / 2 - 0.0008f), Quaternion.identity, Metal(H("#D0D0D0")));
             };
+            B["flower_vase"] = c =>
+            {
+                // 圆肚玻璃花瓶 + 半瓶水
+                var s = c.S(0);
+                float r = s.x / 2, h = s.y / 2;
+                var vase = Shapes.Fillet(P(0, -h, r * 0.62f, -h, r * 0.98f, -h + s.y * 0.3f, r * 0.9f, -h + s.y * 0.55f,
+                    r * 0.5f, h - s.y * 0.12f, r * 0.55f, h, r * 0.48f, h, r * 0.44f, h - s.y * 0.08f), 0.004f, 3);
+                c.V(0).Add(Shapes.Lathe(vase, 40), Glass(H("#E3F4FA"), 0.28f));
+                float wy = -h + s.y * 0.48f;
+                c.V(0).Add(Shapes.Lathe(P(0, -h + 0.004f, r * 0.58f, -h + 0.004f, r * 0.9f, -h + s.y * 0.3f, r * 0.9f, wy, 0, wy), 32),
+                    Mats.Glass(H("#BFE3F5"), 0.35f, 0.9f));
+                // 花束：几枝花 + 叶子，茎插进瓶里
+                var b = c.S(1);
+                float top = b.y / 2;
+                Vector3 rel = c.Rel(0, 1);   // 花瓶中心 → 花束中心
+                float neckY = -rel.y + h;      // 花束坐标系下的瓶口高度
+                var stem = Mats.Lit(H("#6DAA4F"), 0.35f);
+                Color[] petals = { H("#FF9EBB"), H("#FFD36E"), H("#FFFFFF"), H("#C9A7FF"), H("#FF9EBB") };
+                var rng = new System.Random(c.Seed);
+                for (int k = 0; k < 5; k++)
+                {
+                    float a = k / 5f * Mathf.PI * 2 + 0.4f;
+                    float spread = k == 4 ? 0 : b.x * 0.27f;
+                    Vector3 head = new Vector3(Mathf.Cos(a) * spread, top - 0.03f - (k == 4 ? -0.006f : (float)rng.NextDouble() * 0.02f), Mathf.Sin(a) * spread);
+                    Vector3 root = new Vector3(Mathf.Cos(a) * 0.006f, neckY - 0.07f, Mathf.Sin(a) * 0.006f);
+                    Vector3 mid = Vector3.Lerp(root, head, 0.6f); mid.x *= 0.5f; mid.z *= 0.5f;
+                    c.V(1).Add(Shapes.Tube(new[] { root, mid, head }, new[] { 0.0022f, 0.002f, 0.0018f }, 6), stem);
+                    // 花头：一圈胖胖的花瓣 + 花心
+                    Quaternion face = Quaternion.FromToRotation(Vector3.up, (head - mid).normalized);
+                    float pr = 0.022f + (float)rng.NextDouble() * 0.006f;
+                    var petal = Shapes.Ellipsoid(new Vector3(pr * 0.9f, pr * 0.32f, pr * 1.15f), 12, 8);
+                    var pm = Mats.Lit(petals[k], 0.35f);
+                    for (int j = 0; j < 6; j++)
+                    {
+                        Quaternion q = face * Quaternion.Euler(0, j * 60, 0);
+                        c.V(1).Add(petal, head + q * new Vector3(0, 0, pr * 0.48f), q * Quaternion.Euler(-14, 0, 0), pm);
+                    }
+                    c.V(1).Add(Shapes.Ellipsoid(new Vector3(pr * 0.55f, pr * 0.35f, pr * 0.55f), 12, 8), head + face * new Vector3(0, pr * 0.12f, 0), face,
+                        Mats.Lit(k == 1 ? H("#FF9F43") : H("#FFC93C"), 0.3f));
+                }
+                var leafMat = Mats.Lit(H("#7CC06A"), 0.4f);
+                for (int k = 0; k < 4; k++)
+                {
+                    float a = k / 4f * Mathf.PI * 2 + 1.1f;
+                    Vector3 at = new Vector3(Mathf.Cos(a) * 0.008f, neckY + 0.004f, Mathf.Sin(a) * 0.008f);
+                    c.V(1).Add(Leaf(0.07f, 0.03f, 0.25f, c.Seed + k), at, Quaternion.AngleAxis(90 - a * Mathf.Rad2Deg, Vector3.up) * Quaternion.AngleAxis(40, Vector3.right), leafMat);
+                }
+            };
             B["tissues"] = c =>
             {
                 Carton(c, 0, 0.002f, 0.25f);

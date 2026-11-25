@@ -97,6 +97,7 @@ namespace CatMart
             public B Liquid(string hex) { D.LiquidColor = U.Hex(hex); return this; }
             public B Com(float x, float y, float z) { D.ComOffset = U.Cm(x, y, z); return this; }
             public B Bulky() { D.Bulky = true; return this; }
+            public B Upright() { D.Upright = true; return this; }
             public B Freq(float w) { D.Weight = w; return this; }
         }
 
@@ -153,14 +154,14 @@ namespace CatMart
                 .Body(20, 8, 14, "#C8935A", crush: 18, n: "饼袋").Label("#FFFFFF", 0.3f);
             Add("donuts", "甜甜圈 (盒)", Bakery, 5.98f, 0.5f, Squish)
                 .Body(24, 8, 24, "#FFFFFF", crush: 15, n: "纸盒").Logo("#EC407A", 0.6f, 0.5f, 0.5f)
-                .Deco(Shape.Box, 0, 8.1f, 0, 14, 0.2f, 14, "#BBDEFB");
+                .Deco(Shape.Box, 0, 8.1f, 0, 14, 0.2f, 14, "#BBDEFB").Upright();
             Add("croissants", "牛角包 (4个)", Bakery, 4.98f, 0.3f, Crumple)
                 .Body(25, 9, 15, "#D89B4A", crush: 10, n: "透明盒").Gloss(0.6f);
             Add("buns", "汉堡面包 (8个)", Bakery, 1.48f, 0.34f, Crumple)
                 .Body(22, 8, 16, "#E3B878", crush: 12, n: "面包袋").Label("#FFC107", 0.3f);
             Add("cake", "生日蛋糕", Bakery, 14.98f, 1.1f, Squish).Liquid("#FFFFFF")
                 .Body(22, 12, 22, "#FFFFFF", crush: 20, impact: 2.75f, n: "蛋糕盒").Gloss(0.6f)
-                .Deco(Shape.Cylinder, 0, 6, 0, 18, 9, 18, "#F8BBD0").Freq(0.4f);
+                .Deco(Shape.Cylinder, 0, 6, 0, 18, 9, 18, "#F8BBD0").Freq(0.4f).Upright();
 
             // ============ 果蔬 ============
             Add("bananas", "香蕉 (一串)", Produce, 1.37f, 1.2f, Bruise)
@@ -174,7 +175,7 @@ namespace CatMart
                 .Ball("番茄", 0, 3.25f, 0, 7, 6.5f, 7, "#E53935", 25);
             Add("strawberries", "草莓 (1磅盒)", Produce, 3.97f, 0.45f, Squish).Liquid("#B71C1C")
                 .Body(17, 8, 12, "#E53950", crush: 14, n: "草莓盒").Gloss(0.7f)
-                .Deco(Shape.Box, 0, 8.1f, 0, 17.2f, 0.2f, 12.2f, "#E8F5E9");
+                .Deco(Shape.Box, 0, 8.1f, 0, 17.2f, 0.2f, 12.2f, "#E8F5E9").Upright();
             Add("grapes", "无籽葡萄", Produce, 4.48f, 0.9f, Squish).Liquid("#4A148C")
                 .Body(22, 10, 14, "#7B1FA2", crush: 20, n: "葡萄袋").Label("#E1BEE7", 0.25f, 0.8f);
             Add("watermelon", "迷你西瓜", Produce, 4.98f, 4.5f, Leak).Liquid("#E53935")
@@ -318,6 +319,9 @@ namespace CatMart
                 .Deco(Shape.Box, 0, 4.2f, 0, 14, 0.8f, 10, "#2E7D32");
             Add("foil", "铝箔纸", Household, 4.47f, 0.5f, Dent)
                 .Body(32, 5, 5, "#E0E0E0", crush: 100, sharp: 0.35f, n: "长盒").Label("#1565C0", 0.4f);
+            Add("flower_vase", "插花 (玻璃花瓶)", Household, 12.98f, 1.25f, Shatter).Liquid("#D6ECFF")
+                .CylBody(10, 18, "#CFE8F0", crush: 500, impact: 2.6f, n: "花瓶").Gloss(0.9f)
+                .Ball("花束", 0, 25, 0, 17, 14, 17, "#F48FB1", 12).Style(Squish).Com(0, -4, 0).Upright().Freq(0.5f);
             Add("tissues", "抽纸", Household, 1.98f, 0.25f, Crumple)
                 .Body(22, 9, 12, "#B3E5FC", crush: 40, n: "纸盒").Deco(Shape.Box, 0, 9.05f, 0, 8, 0.2f, 3, "#FFFFFF");
             Add("batteries", "AA电池 (8节)", Household, 8.98f, 0.2f, Dent)

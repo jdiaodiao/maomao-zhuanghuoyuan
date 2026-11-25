@@ -37,6 +37,7 @@ namespace CatMart
         public Color LiquidColor = new Color(0.9f, 0.9f, 0.85f);
         public Vector3 ComOffset;   // 米，相对几何中心
         public bool Bulky;          // 大件：放购物车，不装袋
+        public bool Upright;        // 不能倒：倾斜太多就算翻倒（蛋糕、插花…）
         public float Weight = 1f;   // 出现概率权重
         public readonly List<PartDef> Parts = new List<PartDef>();
 
@@ -136,6 +137,72 @@ namespace CatMart
                 if (WeakestImpact > 0) s += " · 易摔碎";
                 return s;
             }
+        }
+    }
+}
+
+namespace CatMart
+{
+    /// <summary>需要玩家特别注意的商品属性。光边颜色和悬停说明里的字用同一种颜色。</summary>
+    public enum ItemTrait { Crushable, Breakable, Sharp, Bulky, Upright }
+
+    public static class ItemTraits
+    {
+        public const float CrushableBelow = 100f;   // 承压低于此值 = 怕压
+        public const float SharpFrom = 0.3f;
+
+        public static readonly Color NormalColor = new Color(1f, 1f, 1f);
+
+        public static System.Collections.Generic.IEnumerable<ItemTrait> Of(ItemDefinition d)
+        {
+            float c = d.WeakestCrush;
+            if (c > 0 && c < CrushableBelow) yield return ItemTrait.Crushable;
+            if (d.WeakestImpact > 0) yield return ItemTrait.Breakable;
+            if (d.MaxSharp >= SharpFrom) yield return ItemTrait.Sharp;
+            if (d.Bulky) yield return ItemTrait.Bulky;
+            if (d.Upright) yield return ItemTrait.Upright;
+        }
+
+        public static string Hex(ItemTrait t)
+        {
+            switch (t)
+            {
+                case ItemTrait.Crushable: return "#FFD84D"; // 黄
+                case ItemTrait.Breakable: return "#FF7FB6"; // 粉
+                case ItemTrait.Sharp: return "#FF8A3D";     // 橙
+                case ItemTrait.Bulky: return "#6FC3FF";     // 蓝
+                case ItemTrait.Upright: return "#5FE08A";   // 绿
+            }
+            return "#FFFFFF";
+        }
+
+        public static Color Color(ItemTrait t) => U.Hex(Hex(t));
+
+        public static string Name(ItemTrait t, ItemDefinition d)
+        {
+            switch (t)
+            {
+                case ItemTrait.Crushable: return d.WeakestCrush < 30 ? "极易压坏" : "怕压";
+                case ItemTrait.Breakable: return "易摔碎";
+                case ItemTrait.Sharp: return "尖锐";
+                case ItemTrait.Bulky: return "大件→推车";
+                case ItemTrait.Upright: return "不能倒";
+            }
+            return "";
+        }
+
+        /// <summary>带颜色的属性说明（富文本）。没有特殊属性时返回白色的结实程度。</summary>
+        public static string RichText(ItemDefinition d)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var t in Of(d))
+            {
+                if (sb.Length > 0) sb.Append(" · ");
+                sb.Append($"<color={Hex(t)}>{Name(t, d)}</color>");
+            }
+            if (sb.Length > 0) return sb.ToString();
+            float c = d.WeakestCrush;
+            return c <= 0 || c >= 1500 ? "普通 · 非常结实" : c >= 400 ? "普通 · 结实" : "普通";
         }
     }
 }

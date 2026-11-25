@@ -31,6 +31,8 @@ namespace CatMart
         public float Patience01 => PatienceMax > 0 ? Mathf.Clamp01(Patience / PatienceMax) : 0;
         public bool ShowReceipt;
         public bool ShowHelp = true;
+        /// <summary>属性提示（商品光边 + 悬停属性说明）。以后难的关卡（比如每天最后一位顾客）可以关掉，靠记忆。</summary>
+        public bool TraitHints = true;
 
         public readonly Bag[] Slots = new Bag[4];
         int _ticket = 1;
@@ -175,6 +177,11 @@ namespace CatMart
         public void OnItemDamaged(GroceryItem item)
         {
             ShowToast($"{item.Def.Name} 损坏！要赔 {U.Money(item.Def.Price)}", 3f);
+        }
+
+        public void OnItemTipped(GroceryItem item)
+        {
+            ShowToast($"{item.Def.Name} 倒了！不能倒的东西要一直立着放（结算扣分）", 3f);
         }
 
         // ------------------------------------------------------------ 每帧

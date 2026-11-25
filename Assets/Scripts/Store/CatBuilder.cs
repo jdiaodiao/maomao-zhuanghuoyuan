@@ -119,9 +119,10 @@ namespace CatMart
                 {
                     ch.Capsule(new Vector3(s * 0.1f, 0.09f, -0.01f), new Vector3(s * 0.16f, 0.27f, -0.02f), 0.085f, 0.022f, 0, 0.035f);
                     ch.Ellipsoid(new Vector3(s * 0.13f, 0.19f, 0.035f), new Vector3(0.04f, 0.065f, 0.015f), 2, 0.004f, Quaternion.Euler(0, 0, -s * 16));
-                    ch.Ellipsoid(new Vector3(s * 0.025f, -0.068f, 0.175f), new Vector3(0.032f, 0.026f, 0.026f), 1, 0.012f);
+                    // 口鼻的形状留在头上（毛色），白色和粉色用单独的光滑网格盖上去，边缘不会有锯齿
+                    ch.Ellipsoid(new Vector3(s * 0.025f, -0.068f, 0.175f), new Vector3(0.032f, 0.026f, 0.026f), 0, 0.012f);
                 }
-                ch.Ellipsoid(new Vector3(0, -0.045f, 0.19f), new Vector3(0.018f, 0.013f, 0.012f), 2, 0.006f);
+                ch.Ellipsoid(new Vector3(0, -0.045f, 0.19f), new Vector3(0.018f, 0.013f, 0.012f), 0, 0.006f);
                 _head = ch.Mesh(new Bounds(new Vector3(0, 0.04f, 0.02f), new Vector3(0.5f, 0.52f, 0.44f)), 0.0042f, 3, 10);
                 _headSdf = ch;
             }
@@ -249,6 +250,12 @@ namespace CatMart
                 lidGo.SetActive(false);
                 furList.Add(lidGo.GetComponent<Renderer>());
                 lidList.Add(lidGo.transform);
+            }
+            if (cozy)
+            {
+                foreach (int s in new[] { -1, 1 })
+                    fv.Add(Shapes.Ellipsoid(new Vector3(0.067f, 0.055f, 0.055f), 32, 20), new Vector3(s * 0.025f, -0.068f, 0.1755f), Quaternion.identity, WhiteMat);
+                fv.Add(Shapes.Ellipsoid(new Vector3(0.039f, 0.029f, 0.027f), 24, 16), new Vector3(0, -0.045f, 0.1905f), Quaternion.identity, PinkMat);
             }
             fv.Spawn(head, "五官");
             npc.Eyelids = lidList.ToArray();

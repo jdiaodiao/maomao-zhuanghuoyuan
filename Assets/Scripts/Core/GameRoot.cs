@@ -46,6 +46,7 @@ namespace CatMart
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.9f, 0.9f, 0.88f);
             camGo.AddComponent<AudioListener>();
+            camGo.AddComponent<ItemOutlines>();   // 商品属性光边（在柔光之前，让光边也微微发光）
             if (ArtStyle.Cozy)
             {
                 cam.backgroundColor = new Color(1f, 0.95f, 0.88f);

@@ -72,6 +72,7 @@ namespace CatMart.EditorTools
             Create("CozyCutoutMat", Shader.Find("CatMart/CozyToonCutout"), null);
             Create("CozyPostMat", Shader.Find("Hidden/CatMart/CozyPost"), null);
             Create("WorldTextMat", Shader.Find("CatMart/WorldText"), null);
+            Create("ItemOutlineMat", Shader.Find("Hidden/CatMart/ItemOutline"), null);
             AssetDatabase.SaveAssets();
         }
 
