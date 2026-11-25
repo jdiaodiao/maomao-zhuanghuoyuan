@@ -1,0 +1,199 @@
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using UnityEngine;
+
+namespace CatMart
+{
+    /// <summary>
+    /// 开发用自动测试（命令行 -catmartAutotest 启动）：
+    /// 跑一单完整流程 + 压坏/摔碎/刺破测试，截图并在日志里输出结果，然后退出。
+    /// </summary>
+    public class DevAutoPilot : MonoBehaviour
+    {
+        string _dir;
+
+        IEnumerator Start()
+        {
+            _dir = Path.Combine(Application.dataPath, "..", "AutotestShots");
+            Directory.CreateDirectory(_dir);
+            var g = GameManager.I;
+            Log($"商品数量 {ItemCatalog.All.Count}");
+            yield return new WaitForSeconds(0.5f);
+            yield return Shot("0_intro");
+
+            g.ResetProgress();
+            g.StartDay();
+            var cam = g.Player.Cam;
+
+            // 等商品全部送到
+            Time.timeScale = 2f;
+            float t = 0;
+            while ((!g.Store.Feeder.Done || AnyMoving()) && t < 40f) { t += Time.unscaledDeltaTime; yield return null; }
+            Time.timeScale = 1f;
+            yield return new WaitForSeconds(1f);
+            Log($"订单: {g.Order.Items.Count} 件, 要求 {g.Order.BagRequestText}, 送达 {g.DeliveredCount}, 传送带运行={g.Store.Belt.Running}");
+            foreach (var it in g.OrderItems) Log($"  {it.Def.Name} pos={it.transform.position} damaged={it.IsDamaged}");
+            g.Player.transform.position = new Vector3(-0.6f, 0, -0.6f);
+            SetView(g.Player, -40, 35);
+            yield return Shot("1_belt");
+
+            // 按要求取袋子
+            foreach (var kv in g.Order.Bags)
+                for (int i = 0; i < kv.Value; i++) g.SpawnBag(BagSpec.Get(g.Order.Material, kv.Key));
+            yield return null;
+
+            // 把商品分配进袋子：重的先放，放到当前最轻的袋子中心上方
+            var bags = g.Slots.Where(b => b != null).ToList();
+            var items = g.OrderItems.Where(i => i != null && !i.IsDestroyed).OrderByDescending(i => i.Def.Mass).ToList();
+            var load = bags.ToDictionary(b => b, b => 0f);
+            foreach (var it in items)
+            {
+                if (it.Def.Bulky)
+                {
+                    Place(it, g.Store.Cart.position + new Vector3(0, Layout.CartFloorY + 0.03f, 0));
+                }
+                else
+                {
+                    var target = load.OrderBy(kv => kv.Value / kv.Key.Spec.CapacityKg).First().Key;
+                    load[target] += it.Def.Mass;
+                    var top = HighestPoint(target);
+                    Place(it, target.transform.position + new Vector3(0, top + 0.015f, 0));
+                }
+                yield return new WaitForSeconds(0.6f);
+            }
+            yield return new WaitForSeconds(2.5f);
+            g.Player.transform.position = new Vector3(0, 0, -0.6f);
+            SetView(g.Player, 0, 42);
+            g.ShowReceipt = true;
+            yield return Shot("2_bagged");
+            g.ShowReceipt = false;
+
+            g.FinishOrder();
+            var r = g.LastResult;
+            Log($"结算: 倍率 {r.Multiplier:0.00} (规格{r.ReqFactor} 平衡{r.BalanceFactor:0.00} 耐心{r.PatienceFactor:0.00} 漏装{r.MissingFactor:0.00}) 工钱 {r.Pay:0.00} 赔偿 {r.DamagePenalty:0.00} 实得 {r.Net:0.00} 星 {r.Stars}");
+            Log($"  规格: {r.ReqNote}; 漏装: {string.Join(",", r.MissingNames)}; 损坏: {string.Join(",", r.DamagedNames)}");
+            foreach (var b in r.Bags) Log($"  袋 {b.Spec.Name} {b.ItemCount}件 {b.Mass:0.0}kg 偏心{b.Imbalance:0.00} x{b.Factor:0.00} {b.Note}");
+            yield return new WaitForSeconds(0.5f);
+            yield return Shot("3_settlement");
+
+            // ---------------- 物理破坏测试 ----------------
+            g.NextCustomer();
+            g.Store.Feeder.Stop();
+            foreach (var it in g.OrderItems) Destroy(it.gameObject);
+            g.OrderItems.Clear();
+            yield return null;
+            float top0 = Layout.CounterTop;
+
+            // 1) 牛奶压薯片
+            var chips = ItemFactory.Create(ItemCatalog.Get("chips"), new Vector3(-0.62f, top0 + 0.05f, 0.2f), Quaternion.Euler(90, 0, 0));
+            // 2) 鸡蛋从 60cm 摔下
+            var eggs = ItemFactory.Create(ItemCatalog.Get("eggs"), new Vector3(-0.2f, top0 + 0.6f, 0.2f), Quaternion.identity);
+            var eggs2 = ItemFactory.Create(ItemCatalog.Get("eggs"), new Vector3(0.64f, top0 + 0.12f, 0.12f), Quaternion.identity);
+            eggs.Rb.isKinematic = true; eggs2.Rb.isKinematic = true;
+            yield return new WaitForSeconds(0.8f);
+            eggs.Rb.isKinematic = false; eggs2.Rb.isKinematic = false;
+            // 3) 罐头放在面包上（不应压坏罐头，面包 12N 上限，罐头 3.4N 不应压坏）
+            var bread = ItemFactory.Create(ItemCatalog.Get("bread"), new Vector3(0.22f, top0 + 0.065f, 0.2f), Quaternion.identity);
+            // 4) 塑料袋 + 竹签 + 重物压
+            g.SpawnBag(BagSpec.Get(BagMaterial.Plastic, BagSize.Medium)); // 会进第一个空位
+            yield return new WaitForSeconds(1.0f);
+            var milk = ItemFactory.Create(ItemCatalog.Get("milk_gallon"), new Vector3(-0.62f, top0 + 0.3f, 0.2f), Quaternion.identity);
+            var soup = ItemFactory.Create(ItemCatalog.Get("canned_soup"), new Vector3(0.22f, top0 + 0.2f, 0.2f), Quaternion.identity);
+            var bag = g.Slots.First(b => b != null);
+            var skewers = ItemFactory.Create(ItemCatalog.Get("skewers"), bag.transform.position + new Vector3(0, 0.03f, 0), Quaternion.Euler(0, 0, 90 - 90));
+            var detergent = ItemFactory.Create(ItemCatalog.Get("detergent"), bag.transform.position + new Vector3(0, 0.25f, 0), Quaternion.identity);
+            g.Player.transform.position = new Vector3(0, 0, -0.6f);
+            SetView(g.Player, 0, 40);
+            yield return new WaitForSeconds(3f);
+            Log($"破坏测试: 薯片被牛奶压 damaged={chips.IsDamaged} (期望 True)");
+            Log($"破坏测试: 鸡蛋 60cm 摔落 damaged={eggs.IsDamaged} (期望 True)");
+            Log($"破坏测试: 鸡蛋 8cm 轻放 damaged={eggs2.IsDamaged} (期望 False)");
+            Log($"破坏测试: 面包上放罐头 bread.damaged={bread.IsDamaged} (期望 False, 0.35kg≈3.4N < 12N)");
+            Log($"破坏测试: 牛奶 damaged={milk.IsDamaged} 罐头 damaged={soup.IsDamaged} (期望 False)");
+            Log($"破坏测试: 竹签+洗衣液压在塑料袋里 torn={bag.Torn} (期望 True)");
+            yield return Shot("4_damage");
+
+            // 5) 各商品外观总览
+            g.NextCustomer();
+            g.Store.Feeder.Stop();
+            foreach (var it in g.OrderItems) Destroy(it.gameObject);
+            g.OrderItems.Clear();
+            g.Store.Customer.gameObject.SetActive(false);
+            var all = ItemCatalog.All;
+            int cols = 10;
+            for (int i = 0; i < all.Count; i++)
+            {
+                int cx = i % cols, cz = i / cols;
+                var p = new Vector3(-2.2f + cx * 0.48f, 0.02f + all[i].Size.y / 2, 1.8f + cz * 0.45f);
+                var it = ItemFactory.Create(all[i], p, Quaternion.identity);
+                it.Rb.isKinematic = true;
+            }
+            g.Player.transform.position = new Vector3(0, 0, -0.6f);
+            var camT = g.Player.Cam.transform;
+            g.Player.Cam.transform.position = new Vector3(0, 3.2f, 0.0f);
+            g.Player.Cam.transform.rotation = Quaternion.Euler(52, 0, 0);
+            g.Player.enabled = false;
+            g.Player.Paws.gameObject.SetActive(false);
+            yield return new WaitForSeconds(0.3f);
+            yield return Shot("5_catalog");
+
+            Log("自动测试完成");
+            Application.Quit();
+        }
+
+        bool AnyMoving()
+        {
+            foreach (var it in GameManager.I.OrderItems)
+                if (it != null && !it.IsDestroyed && it.Rb.linearVelocity.magnitude > 0.02f) return true;
+            return false;
+        }
+
+        float HighestPoint(Bag bag)
+        {
+            float top = 0;
+            foreach (var it in bag.Contents())
+            {
+                foreach (var c in it.GetComponentsInChildren<Collider>())
+                    top = Mathf.Max(top, bag.transform.InverseTransformPoint(c.bounds.max).y);
+            }
+            return top;
+        }
+
+        /// <summary>平放（最短边朝上），bottom 为底部落点。</summary>
+        void Place(GroceryItem it, Vector3 bottom)
+        {
+            it.Rb.linearVelocity = Vector3.zero;
+            it.Rb.angularVelocity = Vector3.zero;
+            var s = it.Def.Size;
+            Quaternion rot = Quaternion.identity;
+            float h = s.y;
+            if (s.x < s.y && s.x <= s.z) { rot = Quaternion.Euler(0, 0, 90); h = s.x; }
+            else if (s.z < s.y && s.z < s.x) { rot = Quaternion.Euler(90, 0, 0); h = s.z; }
+            var pos = bottom + Vector3.up * (h / 2);
+            it.Rb.position = pos;
+            it.Rb.rotation = rot;
+            it.transform.SetPositionAndRotation(pos, rot);
+        }
+
+        void SetView(PlayerController p, float yaw, float pitch)
+        {
+            p.transform.rotation = Quaternion.Euler(0, yaw, 0);
+            p.Cam.transform.localRotation = Quaternion.Euler(pitch, 0, 0);
+            p.enabled = false;
+        }
+
+        IEnumerator Shot(string name)
+        {
+            yield return new WaitForEndOfFrame();
+            var path = Path.Combine(_dir, name + ".png");
+            ScreenCapture.CaptureScreenshot(path);
+            yield return null;
+            yield return null;
+            Log("截图 " + path);
+        }
+
+        static void Log(string s) => Debug.Log("[AUTOTEST] " + s);
+    }
+}
