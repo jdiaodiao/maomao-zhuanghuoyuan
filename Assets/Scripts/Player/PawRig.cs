@@ -9,13 +9,51 @@ namespace CatMart
         public GroceryItem HoldTarget;
         public bool Walking;
 
-        Vector3 _restL = new Vector3(-0.2f, -0.24f, 0.38f);
-        Vector3 _restR = new Vector3(0.2f, -0.24f, 0.38f);
+        Vector3 _restL = new Vector3(-0.2f, -0.23f, 0.36f);
+        Vector3 _restR = new Vector3(0.2f, -0.23f, 0.36f);
         float _swipe, _t;
 
         public static readonly Color Fur = U.Hex("#E8923A");
-        public static readonly Color FurLight = U.Hex("#F7D9B5");
-        public static readonly Color Pad = U.Hex("#F4A6B8");
+        public static readonly Color Sock = U.Hex("#FBF6EE");
+        public static readonly Color Pad = U.Hex("#F4A0B4");
+
+        static MB[] _mesh;
+
+        static Texture2D Tabby => TexGen.Get("tabby", () => TexGen.Make(256, 256, (u, v) =>
+        {
+            float n = Noise.Fbm2(u * 4, v * 4, 3, 301, 4);
+            float s = Mathf.Abs(Mathf.Sin((u * 7 + v * 2 + n * 1.6f) * Mathf.PI));
+            float stripe = Mathf.SmoothStep(0.72f, 0.95f, s);
+            float fine = Noise.Fbm2(u * 64, v * 10, 3, 302, 64) * 0.18f;
+            float g = 1f - stripe * 0.38f + fine - 0.09f;
+            return new Color(g, g, g, 1);
+        }));
+
+        static MB[] Mesh()
+        {
+            if (_mesh != null) return _mesh;
+            var s = new Sdf { DefaultBlend = 0.022f };
+            // 前臂（向后、向下延伸出屏幕）
+            s.Capsule(new Vector3(0, -0.01f, -0.04f), new Vector3(0, -0.07f, -0.42f), 0.043f, 0.052f);
+            // 手掌 + 脚趾（白袜子）
+            s.Ellipsoid(new Vector3(0, 0, 0.01f), new Vector3(0.052f, 0.034f, 0.06f), 1, 0.03f);
+            for (int i = 0; i < 4; i++)
+            {
+                float x = (i - 1.5f) * 0.024f;
+                float z = 0.052f + (i == 1 || i == 2 ? 0.01f : 0f);
+                s.Sphere(new Vector3(x, 0.006f, z), 0.019f, 1, 0.012f);
+            }
+            // 肉垫（粉）
+            s.Ellipsoid(new Vector3(0, -0.03f, 0.0f), new Vector3(0.026f, 0.012f, 0.022f), 2, 0.006f);
+            for (int i = 0; i < 4; i++)
+            {
+                float x = (i - 1.5f) * 0.024f;
+                float z = 0.054f + (i == 1 || i == 2 ? 0.01f : 0f);
+                s.Ellipsoid(new Vector3(x, -0.012f, z), new Vector3(0.009f, 0.007f, 0.009f), 2, 0.004f);
+            }
+            _mesh = s.Mesh(new Bounds(new Vector3(0, -0.03f, -0.17f), new Vector3(0.16f, 0.16f, 0.56f)), 0.0045f, 3, 18);
+            return _mesh;
+        }
 
         public static PawRig Build(Camera cam)
         {
@@ -30,27 +68,15 @@ namespace CatMart
 
         static Transform BuildPaw(Transform parent, int side)
         {
-            var root = new GameObject(side < 0 ? "左爪" : "右爪").transform;
-            root.SetParent(parent, false);
-            // 前臂向后延伸到屏幕外
-            ProcMesh.Visual(root, Shape.Cylinder, new Vector3(0, -0.02f, -0.16f), new Vector3(0.075f, 0.3f, 0.075f), Fur, Quaternion.Euler(80, 0, 0), 0.05f);
-            // 条纹
-            for (int i = 0; i < 3; i++)
-                ProcMesh.Visual(root, Shape.Cylinder, new Vector3(0, -0.01f - i * 0.0f, -0.07f - i * 0.07f), new Vector3(0.078f, 0.018f, 0.078f), U.Hex("#C06A22"), Quaternion.Euler(80, 0, 0), 0.05f);
-            // 爪掌
-            ProcMesh.Visual(root, Shape.Sphere, Vector3.zero, new Vector3(0.095f, 0.07f, 0.11f), FurLight, null, 0.05f);
-            // 肉垫（下方）
-            ProcMesh.Visual(root, Shape.Sphere, new Vector3(0, -0.03f, 0.0f), new Vector3(0.05f, 0.02f, 0.045f), Pad, null, 0.4f);
-            for (int i = 0; i < 4; i++)
-            {
-                float x = (i - 1.5f) * 0.022f;
-                float z = 0.035f + (i == 1 || i == 2 ? 0.008f : 0f);
-                ProcMesh.Visual(root, Shape.Sphere, new Vector3(x, -0.026f, z), new Vector3(0.018f, 0.012f, 0.018f), Pad, null, 0.4f);
-                // 指头
-                ProcMesh.Visual(root, Shape.Sphere, new Vector3(x, 0.005f, z + 0.012f), new Vector3(0.026f, 0.03f, 0.03f), FurLight, null, 0.05f);
-            }
-            root.localRotation = Quaternion.Euler(15, side * -8f, 0);
-            return root;
+            var regions = Mesh();
+            var v = new VisualSet();
+            v.Add(regions[0], Mats.Lit(Fur, 0.22f, 0, Tabby, TexGen.FurN, 0.8f, new Vector2(1, 1)));
+            v.Add(regions[1], Mats.Lit(Sock, 0.22f, 0, TexGen.Fur, TexGen.FurN, 0.7f));
+            v.Add(regions[2], Mats.Lit(Pad, 0.55f, 0));
+            var go = v.Spawn(parent, side < 0 ? "左爪" : "右爪");
+            go.transform.localRotation = Quaternion.Euler(15, side * -8f, 0);
+            go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            return go.transform;
         }
 
         public void Swipe() { if (_swipe <= 0) { _swipe = 0.35f; Sfx.Play("grab", 0.3f); } }
@@ -61,10 +87,8 @@ namespace CatMart
             float bob = Mathf.Sin(_t) * (Walking ? 0.012f : 0.004f);
             var cam = transform.parent;
 
-            // 左爪：待机
             Left.localPosition = Vector3.Lerp(Left.localPosition, _restL + new Vector3(0, bob, 0), Time.deltaTime * 10f);
 
-            // 右爪：拿东西 / 挥爪 / 待机
             Vector3 targetR = _restR + new Vector3(0, -bob, 0);
             Quaternion rotR = Quaternion.Euler(15, 8, 0);
             if (HoldTarget != null && HoldTarget.gameObject.activeInHierarchy)
@@ -72,8 +96,8 @@ namespace CatMart
                 Vector3 top = HoldTarget.WorldCom + Vector3.up * HoldTarget.Def.Size.y * 0.5f;
                 Vector3 local = cam.InverseTransformPoint(top);
                 local.z = Mathf.Clamp(local.z, 0.3f, 1.3f);
-                targetR = local + new Vector3(0.03f, 0.03f, -0.04f);
-                rotR = Quaternion.Euler(35, 0, 0);
+                targetR = local + new Vector3(0.02f, 0.035f, -0.03f);
+                rotR = Quaternion.Euler(32, 0, 0);
             }
             else if (_swipe > 0)
             {

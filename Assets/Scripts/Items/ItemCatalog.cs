@@ -202,8 +202,8 @@ namespace CatMart
                 .BallBody(13, 19, 13, "#C68A2B", crush: 400, sharp: 0.5f, n: "果身")
                 .Cone("叶冠", 0, 25, 0, 10, 12, 10, "#558B2F", 300, sharp: 0.85f).Com(0, -2, 0);
             Add("lemons", "柠檬 (2个)", Produce, 1.16f, 0.25f, Bruise)
-                .Ball("柠檬", -3.6f, 3, 0, 7, 6, 6, "#FDD835", 80).Rot(0, 0, 90)
-                .Ball("柠檬", 3.6f, 3, 0, 7, 6, 6, "#FBC02D", 80).Rot(0, 0, 90);
+                .Ball("柠檬", -3.6f, 3, 0, 7, 6, 6, "#FDD835", 80)
+                .Ball("柠檬", 3.6f, 3, 0, 7, 6, 6, "#FBC02D", 80);
             Add("carrots", "胡萝卜 (2磅)", Produce, 1.68f, 0.9f, Bruise)
                 .Body(26, 6, 14, "#FB8C00", crush: 300, n: "袋子").Label("#43A047", 0.4f, 0.9f);
 

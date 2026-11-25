@@ -64,7 +64,9 @@ namespace CatMart
                 mf.sharedMesh = mesh;
 
                 var mr = mf.GetComponent<MeshRenderer>();
-                mr.sharedMaterial = Mats.Get(DamagedColor(mr.sharedMaterial.color, style), 0.15f);
+                var mats = mr.sharedMaterials;
+                for (int k = 0; k < mats.Length; k++) mats[k] = DamagedMat(mats[k], style);
+                mr.sharedMaterials = mats;
             }
 
             switch (style)
@@ -116,6 +118,22 @@ namespace CatMart
 
         static float Noise(Vector3 q, int seed) =>
             Mathf.PerlinNoise(q.x * 2.3f + q.z * 1.7f + seed * 0.13f, q.y * 2.9f - q.z * 1.1f + seed * 0.07f);
+
+        static readonly Dictionary<(Material, DamageStyle), Material> DamagedCache = new Dictionary<(Material, DamageStyle), Material>();
+
+        /// <summary>损坏后的材质：保留贴图，颜色变暗/变褐，光泽降低。</summary>
+        static Material DamagedMat(Material m, DamageStyle s)
+        {
+            if (m == null) return null;
+            if (DamagedCache.TryGetValue((m, s), out var d) && d != null) return d;
+            d = new Material(m);
+            Color c = DamagedColor(m.color, s);
+            c.a = m.color.a;
+            d.color = c;
+            if (d.HasProperty("_Glossiness")) d.SetFloat("_Glossiness", d.GetFloat("_Glossiness") * 0.6f);
+            DamagedCache[(m, s)] = d;
+            return d;
+        }
 
         static Color DamagedColor(Color c, DamageStyle s)
         {

@@ -122,22 +122,37 @@ namespace CatMart
             g.OrderItems.Clear();
             g.Store.Customer.gameObject.SetActive(false);
             var all = ItemCatalog.All;
-            int cols = 10;
-            for (int i = 0; i < all.Count; i++)
-            {
-                int cx = i % cols, cz = i / cols;
-                var p = new Vector3(-2.2f + cx * 0.48f, 0.02f + all[i].Size.y / 2, 1.8f + cz * 0.45f);
-                var it = ItemFactory.Create(all[i], p, Quaternion.identity);
-                it.Rb.isKinematic = true;
-            }
-            g.Player.transform.position = new Vector3(0, 0, -0.6f);
-            var camT = g.Player.Cam.transform;
-            g.Player.Cam.transform.position = new Vector3(0, 3.2f, 0.0f);
-            g.Player.Cam.transform.rotation = Quaternion.Euler(52, 0, 0);
             g.Player.enabled = false;
             g.Player.Paws.gameObject.SetActive(false);
-            yield return new WaitForSeconds(0.3f);
-            yield return Shot("5_catalog");
+            g.ShowHelp = false;
+            HUD.Hidden = true;
+            // 商品特写：每组 18 件，分两排摆在地上
+            const int per = 6, cols = 6;
+            for (int group = 0; group * per < all.Count; group++)
+            {
+                var spawned = new List<GroceryItem>();
+                for (int k = 0; k < per && group * per + k < all.Count; k++)
+                {
+                    var d = all[group * per + k];
+                    int cx = k % cols, cz = k / cols;
+                    var p = new Vector3(3.0f + cx * 0.32f, 0.005f + d.Size.y / 2, 0.5f + cz * 0.42f);
+                    var it = ItemFactory.Create(d, p, Quaternion.Euler(0, (cx - 4) * 4, 0));
+                    it.Rb.isKinematic = true;
+                    spawned.Add(it);
+                }
+                g.Player.Cam.transform.position = new Vector3(3.8f, 0.55f, -0.22f);
+                g.Player.Cam.transform.rotation = Quaternion.Euler(32, 0, 0);
+                yield return new WaitForSeconds(0.2f);
+                yield return Shot($"6_items_{group}");
+                foreach (var it in spawned) Destroy(it.gameObject);
+                yield return null;
+            }
+            // 全景
+            g.Player.Cam.transform.position = new Vector3(0.9f, 1.75f, -1.1f);
+            g.Player.Cam.transform.rotation = Quaternion.Euler(24, -25, 0);
+            g.Store.Customer.gameObject.SetActive(true);
+            yield return new WaitForSeconds(0.2f);
+            yield return Shot("7_store");
 
             Log("自动测试完成");
             Application.Quit();

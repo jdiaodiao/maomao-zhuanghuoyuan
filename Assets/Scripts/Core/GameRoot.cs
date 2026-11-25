@@ -26,6 +26,11 @@ namespace CatMart
             var store = StoreBuilder.Build();
             StoreBuilder.SetupLighting(store.Root);
 
+            // 预生成全部商品外观（包装贴图烘焙 + 网格），避免游戏中卡顿
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            ItemLooks.WarmAll();
+            Debug.Log($"商品外观生成完成: {ItemCatalog.All.Count} 件, {sw.ElapsedMilliseconds} ms");
+
             // 玩家
             var player = new GameObject("玩家");
             player.transform.position = new Vector3(Layout.PlayerStart.x, 0, Layout.PlayerStart.z);

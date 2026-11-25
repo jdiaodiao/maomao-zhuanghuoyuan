@@ -59,9 +59,11 @@ namespace CatMart
 
         float S(float v) => v * _scale;
 
+        public static bool Hidden;
+
         void OnGUI()
         {
-            if (G == null) return;
+            if (G == null || Hidden) return;
             BuildStyles();
             switch (G.Phase)
             {
@@ -125,9 +127,9 @@ namespace CatMart
             var o = G.Order;
             if (o == null) return;
 
-            // 上中：顾客要求 + 耐心
-            float w = S(720);
-            var rr = new Rect((Screen.width - w) / 2, S(16), w, S(122));
+            // 左上：顾客要求 + 耐心（不挡住正前方的顾客）
+            float w = S(560);
+            var rr = new Rect(S(16), S(120), w, S(118));
             GUILayout.BeginArea(rr, _panel);
             GUILayout.Label($"<b>{o.CustomerName}</b> 的要求：<color=#F2C14E><b>{o.BagRequestText}</b></color>" +
                             (o.Items.Any(i => i.Bulky) ? "  <color=#9EC9FF>（大件放推车）</color>" : ""), _label);
@@ -245,8 +247,8 @@ namespace CatMart
             var lines = G.Store.Receipt.FullText();
             float w = S(420);
             int count = G.Store.Receipt.Lines.Count;
-            float h = Mathf.Min(Screen.height - S(200), S(60) + count * S(24));
-            var r = new Rect(S(16), S(130), w, h);
+            float h = Mathf.Min(Screen.height - S(380), S(60) + count * S(24));
+            var r = new Rect(S(16), S(250), w, h);
             var st = new GUIStyle(_panel);
             st.normal.background = _bgLight;
             GUILayout.BeginArea(r, st);

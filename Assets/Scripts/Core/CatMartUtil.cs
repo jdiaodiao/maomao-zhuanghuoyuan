@@ -99,6 +99,116 @@ namespace CatMart
             }
             return m;
         }
+
+        // ---------------------------------------------------------------- 生产级材质
+        static readonly Dictionary<string, Material> Named = new Dictionary<string, Material>();
+        static readonly Dictionary<string, Material> Templates = new Dictionary<string, Material>();
+
+        static Material Tpl(string name)
+        {
+            if (Templates.TryGetValue(name, out var t) && t != null) return t;
+            var res = Resources.Load<Material>("CatMart/" + name);
+            t = res != null ? res : Template;
+            Templates[name] = t;
+            return t;
+        }
+
+        static string K(params object[] parts) => string.Join("|", parts);
+
+        /// <summary>PBR 不透明材质。albedo 与颜色相乘；normal 为法线贴图。</summary>
+        public static Material Lit(Color c, float smooth = 0.3f, float metallic = 0f, Texture albedo = null, Texture normal = null,
+            float bump = 1f, Vector2? tiling = null)
+        {
+            Vector2 tile = tiling ?? Vector2.one;
+            string key = K("lit", Col(c), smooth.ToString("0.00"), metallic.ToString("0.00"), albedo ? albedo.GetInstanceIDSafe() : 0,
+                normal ? normal.GetInstanceIDSafe() : 0, bump.ToString("0.0"), tile.x.ToString("0.00"), tile.y.ToString("0.00"));
+            if (Named.TryGetValue(key, out var m) && m != null) return m;
+            m = new Material(Tpl(normal != null ? "NormalMat" : "BaseMat")) { color = c };
+            m.SetFloat("_Glossiness", smooth);
+            m.SetFloat("_Metallic", metallic);
+            if (albedo != null) m.mainTexture = albedo;
+            if (normal != null)
+            {
+                m.SetTexture("_BumpMap", normal);
+                m.SetFloat("_BumpScale", bump);
+                m.EnableKeyword("_NORMALMAP");
+            }
+            m.mainTextureScale = tile;
+            Named[key] = m;
+            return m;
+        }
+
+        /// <summary>玻璃/透明塑料（预乘透明，保留高光）。</summary>
+        public static Material Glass(Color tint, float alpha = 0.25f, float smooth = 0.95f, Texture normal = null, float bump = 0.35f)
+        {
+            string key = K("glass", Col(tint), alpha.ToString("0.00"), smooth.ToString("0.00"), normal ? normal.GetInstanceIDSafe() : 0, bump.ToString("0.00"));
+            if (Named.TryGetValue(key, out var m) && m != null) return m;
+            tint.a = alpha;
+            m = new Material(Tpl(normal != null ? "GlassNormalMat" : "GlassMat")) { color = tint };
+            m.SetFloat("_Glossiness", smooth);
+            m.SetFloat("_Metallic", 0.05f);
+            if (normal != null) { m.SetTexture("_BumpMap", normal); m.SetFloat("_BumpScale", bump); m.EnableKeyword("_NORMALMAP"); }
+            Named[key] = m;
+            return m;
+        }
+
+        /// <summary>镂空材质（网袋、羽毛）。</summary>
+        public static Material Cutout(Color c, Texture alphaTex, float cutoff = 0.5f, Vector2? tiling = null)
+        {
+            string key = K("cut", Col(c), alphaTex.GetInstanceIDSafe(), tiling ?? Vector2.one);
+            if (Named.TryGetValue(key, out var m) && m != null) return m;
+            m = new Material(Tpl("CutoutMat")) { color = c, mainTexture = alphaTex };
+            m.SetFloat("_Cutoff", cutoff);
+            m.mainTextureScale = tiling ?? Vector2.one;
+            Named[key] = m;
+            return m;
+        }
+
+        /// <summary>贴图标签材质（每件商品独有）。</summary>
+        public static Material Label(Texture tex, float smooth = 0.35f, float metallic = 0f)
+        {
+            var m = new Material(Tpl("BaseMat")) { color = Color.white, mainTexture = tex };
+            m.SetFloat("_Glossiness", smooth);
+            m.SetFloat("_Metallic", metallic);
+            return m;
+        }
+
+        public static Material Unlit(Color c)
+        {
+            string key = K("unlit", Col(c));
+            if (Named.TryGetValue(key, out var m) && m != null) return m;
+            var tpl = Resources.Load<Material>("CatMart/UnlitColorMat");
+            m = tpl != null ? new Material(tpl) : new Material(Shader.Find("Unlit/Color"));
+            m.color = c;
+            Named[key] = m;
+            return m;
+        }
+
+        public static Material UnlitTex(Texture tex)
+        {
+            string key = K("unlitT", tex.GetInstanceIDSafe());
+            if (Named.TryGetValue(key, out var m) && m != null) return m;
+            var tpl = Resources.Load<Material>("CatMart/UnlitTexMat");
+            m = tpl != null ? new Material(tpl) : new Material(Shader.Find("Unlit/Texture"));
+            m.mainTexture = tex;
+            Named[key] = m;
+            return m;
+        }
+
+        static string Col(Color c) => ColorUtility.ToHtmlStringRGBA(c);
+    }
+
+    public static class ObjIdExt
+    {
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Object, object> Ids = new System.Runtime.CompilerServices.ConditionalWeakTable<Object, object>();
+        static int _next = 1;
+
+        /// <summary>给对象分配稳定的整数 id（GetInstanceID 在新版 Unity 已弃用）。</summary>
+        public static int GetInstanceIDSafe(this Object o)
+        {
+            if (o == null) return 0;
+            return (int)Ids.GetValue(o, _ => _next++);
+        }
     }
 
     /// <summary>中文动态字体（系统字体）。</summary>
@@ -135,7 +245,15 @@ namespace CatMart
             var tm = go.AddComponent<TextMesh>();
             tm.font = Fonts.Main;
             tm.fontSize = 64;
-            tm.characterSize = height / 64f * 1.4f;
+            tm.characterSize = 0.01f;
+            go.GetComponent<MeshRenderer>().sharedMaterial = Fonts.Main.material;
+            // 用一个汉字实测字高，再换算成要求的高度（米）
+            tm.text = "国";
+            var q = go.transform.rotation;
+            go.transform.rotation = Quaternion.identity;
+            float measured = go.GetComponent<MeshRenderer>().bounds.size.y;
+            go.transform.rotation = q;
+            tm.characterSize = measured > 1e-6f ? 0.01f * height / measured : height * 0.15f;
             tm.anchor = anchor;
             tm.alignment = anchor == TextAnchor.MiddleLeft || anchor == TextAnchor.UpperLeft || anchor == TextAnchor.LowerLeft
                 ? TextAlignment.Left : TextAlignment.Center;

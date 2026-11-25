@@ -42,8 +42,57 @@ namespace CatMart.EditorTools
                 m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
                 AssetDatabase.CreateAsset(m, emPath);
             }
+
+            // 法线贴图
+            Create("NormalMat", shader, m =>
+            {
+                m.EnableKeyword("_NORMALMAP");
+            });
+            // 透明（玻璃/塑料膜）
+            Create("GlassMat", shader, m => SetupTransparent(m));
+            Create("GlassNormalMat", shader, m => { SetupTransparent(m); m.EnableKeyword("_NORMALMAP"); });
+            // 镂空（网袋）
+            Create("CutoutMat", shader, m =>
+            {
+                m.SetFloat("_Mode", 1);
+                m.SetOverrideTag("RenderType", "TransparentCutout");
+                m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+                m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
+                m.SetInt("_ZWrite", 1);
+                m.EnableKeyword("_ALPHATEST_ON");
+                m.SetFloat("_Cutoff", 0.5f);
+                m.renderQueue = 2450;
+            });
+            // 无光照（包装贴图烘焙用）
+            Create("UnlitColorMat", Shader.Find("Unlit/Color"), null);
+            Create("UnlitTexMat", Shader.Find("Unlit/Texture"), null);
             AssetDatabase.SaveAssets();
         }
+
+        static void Create(string name, Shader shader, System.Action<Material> setup)
+        {
+            string path = ResDir + "/" + name + ".mat";
+            if (shader == null || AssetDatabase.LoadAssetAtPath<Material>(path) != null) return;
+            var m = new Material(shader) { color = Color.white };
+            setup?.Invoke(m);
+            AssetDatabase.CreateAsset(m, path);
+        }
+
+        static void SetupTransparent(Material m)
+        {
+            m.SetFloat("_Mode", 3);
+            m.SetOverrideTag("RenderType", "Transparent");
+            m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+            m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            m.SetInt("_ZWrite", 0);
+            m.DisableKeyword("_ALPHATEST_ON");
+            m.DisableKeyword("_ALPHABLEND_ON");
+            m.EnableKeyword("_ALPHAPREMULTIPLY_ON");
+            m.renderQueue = 3000;
+        }
+
+        [MenuItem("CatMart/重建材质模板")]
+        public static void EnsureMaterialsMenu() => EnsureMaterials();
 
         static void ConfigurePlayer()
         {
