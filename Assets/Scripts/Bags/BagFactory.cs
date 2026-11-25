@@ -24,7 +24,7 @@ namespace CatMart
             root.transform.SetPositionAndRotation(position, rotation);
             var t = root.transform;
             float w = spec.Inner.x, h = spec.Inner.y, d = spec.Inner.z;
-            const float col = 0.02f;
+            const float col = 0.05f;   // 碰撞体向外加厚（画面不变），更难被推穿
 
             // 外观（按规格缓存）
             string key = spec.Material + "_" + spec.Size;
@@ -45,11 +45,13 @@ namespace CatMart
             else BagWallDeformer.Create(t, spec, FilmMat, FilmMat);
 
             // 碰撞（向外加厚，防穿透）
-            Col(t, new Vector3(0, -col / 2, 0), new Vector3(w + col * 2, col, d + col * 2));
-            Col(t, new Vector3(-(w + col) / 2, h / 2, 0), new Vector3(col, h, d + col * 2));
-            Col(t, new Vector3((w + col) / 2, h / 2, 0), new Vector3(col, h, d + col * 2));
-            Col(t, new Vector3(0, h / 2, (d + col) / 2), new Vector3(w + col * 2, h, col));
-            Col(t, new Vector3(0, h / 2, -(d + col) / 2), new Vector3(w + col * 2, h, col));
+            // 塑料袋有弹性：碰撞墙往外让出 Stretch，稍大的东西能撑进去（画面上袋壁会鼓起来）
+            float cw = w + spec.Stretch * 2, cd = d + spec.Stretch * 2;
+            Col(t, new Vector3(0, -col / 2, 0), new Vector3(cw + col * 2, col, cd + col * 2));
+            Col(t, new Vector3(-(cw + col) / 2, h / 2, 0), new Vector3(col, h, cd + col * 2));
+            Col(t, new Vector3((cw + col) / 2, h / 2, 0), new Vector3(col, h, cd + col * 2));
+            Col(t, new Vector3(0, h / 2, (cd + col) / 2), new Vector3(cw + col * 2, h, col));
+            Col(t, new Vector3(0, h / 2, -(cd + col) / 2), new Vector3(cw + col * 2, h, col));
 
             // 尺寸标
             Text3D.Create(t, spec.SizeLetter, new Vector3(w * 0.36f, h * 0.88f, -(d / 2 + 0.004f)), 0.04f,

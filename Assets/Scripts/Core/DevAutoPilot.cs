@@ -59,7 +59,7 @@ namespace CatMart
                     var target = load.OrderBy(kv => kv.Value / kv.Key.Spec.CapacityKg).First().Key;
                     load[target] += it.Def.Mass;
                     var top = HighestPoint(target);
-                    Place(it, target.transform.position + new Vector3(0, top + 0.015f, 0));
+                    Place(it, target.transform.position + new Vector3(0, top + 0.015f, 0), target);
                 }
                 yield return new WaitForSeconds(0.6f);
             }
@@ -75,7 +75,7 @@ namespace CatMart
             g.Player.SetTopView(true, false);
             g.Player.FocusSlot(0);
             yield return new WaitForSeconds(0.8f);
-            foreach (var bg in g.Slots) if (bg != null) { var df = bg.GetComponentInChildren<BagWallDeformer>(); var st2 = bg.Compute(); Log($"袋壁形变: {bg.Spec.Name} {st2.Count}件 最大外推 {df.MaxPush * 100:0.0}cm 高出袋口 {st2.Unstable}件"); }
+            foreach (var bg in g.Slots) if (bg != null) { var df = bg.GetComponentInChildren<BagWallDeformer>(); var st2 = bg.Compute(); int ins = VisualPokeOut(bg, out string who); Log($"袋壁形变: {bg.Spec.Name} {st2.Count}件 最大外推 {df.MaxPush * 100:0.0}cm 高出袋口 {st2.Unstable}件 商品画面穿出袋壁 {ins} [{who}]"); }
             yield return Shot("2b_topview");
             // 轨迹测试：把放在袋子旁边台面上的麦片拿进 1 号袋（需要越过袋壁）
             var bag1 = g.Slots[0];
@@ -167,6 +167,9 @@ namespace CatMart
             g.Player.DebugEndPress();
             g.Player.enabled = false;
 
+            // 4b) 穿模测试：像玩家一样在俯视模式里把薄而大的零食一件件轻放进袋子
+            yield return ClipTest(g);
+
             // 5) 各商品外观总览
             g.NextCustomer();
             g.Store.Feeder.Stop();
@@ -210,6 +213,106 @@ namespace CatMart
             Application.Quit();
         }
 
+        IEnumerator ClipTest(GameManager g)
+        {
+            g.NextCustomer();
+            g.Store.Feeder.Stop();
+            foreach (var it in g.OrderItems) Destroy(it.gameObject);
+            g.OrderItems.Clear();
+            yield return null;
+            g.SpawnBag(BagSpec.Get(BagMaterial.Plastic, BagSize.Medium));
+            g.SpawnBag(BagSpec.Get(BagMaterial.Paper, BagSize.Medium));
+            var bags = new[] { g.Slots[0], g.Slots[1] };
+            string[] ids = { "chips", "tortilla_chips", "cereal", "bread", "cookies" };
+            g.Player.enabled = true;
+            g.Player.SetTopView(true, false);
+            g.Player.FocusSlot(0);
+            var placed = new List<GroceryItem>();
+            for (int b = 0; b < 2; b++)
+            {
+                var bag = bags[b];
+                for (int k = 0; k < ids.Length; k++)
+                {
+                    var d = ItemCatalog.Get(ids[k]);
+                    // 放在台面靠近玩家一侧，像刚从传送带拿过来
+                    var it = ItemFactory.Create(d, new Vector3(0.45f, Layout.CounterTop + d.Size.y / 2 + 0.01f, -0.02f), Quaternion.identity);
+                    placed.Add(it);
+                    yield return new WaitForSeconds(0.4f);
+                    g.Player.Grab(it);
+                    var target = new Vector2(bag.transform.position.x + (k % 2 - 0.5f) * 0.05f, bag.transform.position.z);
+                    g.Player.DebugTopTarget = target;
+                    for (float t = 0; t < 3f; t += Time.deltaTime)
+                    {
+                        var c = it.WorldCom;
+                        if (new Vector2(c.x - target.x, c.z - target.y).magnitude < 0.02f) break;
+                        yield return null;
+                    }
+                    g.Player.PlaceGently();
+                    for (float t = 0; t < 3f && g.Player.Placing; t += Time.deltaTime) yield return null;
+                    g.Player.DebugTopTarget = null;
+                    yield return new WaitForSeconds(0.3f);
+                }
+            }
+            g.Player.SetTopView(false, false);
+            g.Player.enabled = false;
+            yield return new WaitForSeconds(2f);
+
+            for (int b = 0; b < 2; b++)
+            {
+                var bag = bags[b];
+                var df = bag.GetComponentInChildren<BagWallDeformer>();
+                int inside = df.DebugVertsInsideItems(out string who);
+                // 物理穿透：商品碰撞体 vs 袋壁碰撞体
+                float maxDepth = 0; string deepest = "";
+                var bagCols = bag.GetComponentsInChildren<BoxCollider>();
+                foreach (var it in placed)
+                foreach (var part in it.Parts)
+                foreach (var bc in bagCols)
+                {
+                    if (part.Col == null || !part.Col.enabled) continue;
+                    if (Physics.ComputePenetration(part.Col, part.Col.transform.position, part.Col.transform.rotation,
+                            bc, bc.transform.position, bc.transform.rotation, out _, out float depth) && depth > maxDepth)
+                    { maxDepth = depth; deepest = it.Def.Name; }
+                }
+                int inBag = placed.Count(it => bag.Contains(it));
+                int poke = VisualPokeOut(bag, out string pokeWho);
+                Log($"穿模测试 {bag.Spec.Name}: 袋内 {inBag} 件; 商品画面穿出袋壁 {poke} 个顶点 [{pokeWho}]; 袋壁顶点在商品碰撞体内 {inside} [{who}]; 最大物理穿透 {maxDepth * 100:0.0}cm ({deepest})");
+            }
+            g.Player.transform.position = new Vector3(-0.4f, 0, -0.6f);
+            g.Player.Cam.transform.position = new Vector3(-0.4f, 1.25f, -0.45f);
+            g.Player.Cam.transform.rotation = Quaternion.Euler(38, 0, 0);
+            yield return new WaitForSeconds(0.2f);
+            yield return Shot("4c_cliptest");
+            foreach (var it in placed) if (it != null) Destroy(it.gameObject);
+        }
+
+        /// <summary>诊断：袋内商品的画面顶点有多少穿出了袋壁（袋口以下、超出袋壁 1cm 以上）。</summary>
+        static int VisualPokeOut(Bag bag, out string who)
+        {
+            int count = 0;
+            var tally = new Dictionary<string, int>();
+            Vector3 h = bag.Spec.Inner * 0.5f;
+            foreach (var it in bag.Contents())
+            foreach (var mf in it.GetComponentsInChildren<MeshFilter>())
+            {
+                var v = mf.sharedMesh.vertices;
+                for (int i = 0; i < v.Length; i++)
+                {
+                    Vector3 p = bag.transform.InverseTransformPoint(mf.transform.TransformPoint(v[i]));
+                    if (p.y > bag.Spec.Inner.y - 0.01f) continue;
+                    float m = 0.01f + bag.Spec.Stretch;
+                    if (Mathf.Abs(p.x) > h.x + m || Mathf.Abs(p.z) > h.z + m || p.y < -0.01f)
+                    {
+                        count++;
+                        tally.TryGetValue(it.Def.Name, out int k);
+                        tally[it.Def.Name] = k + 1;
+                    }
+                }
+            }
+            who = string.Join(", ", tally.Select(kv => $"{kv.Key}:{kv.Value}"));
+            return count;
+        }
+
         bool AnyMoving()
         {
             foreach (var it in GameManager.I.OrderItems)
@@ -229,15 +332,27 @@ namespace CatMart
         }
 
         /// <summary>平放（最短边朝上），bottom 为底部落点。</summary>
-        void Place(GroceryItem it, Vector3 bottom)
+        void Place(GroceryItem it, Vector3 bottom, Bag bag = null)
         {
             it.Rb.linearVelocity = Vector3.zero;
             it.Rb.angularVelocity = Vector3.zero;
             var s = it.Def.Size;
+            // 在 6 种轴向摆法里，选底面放得进袋子、且高度最低的（放不进就选最接近的）
+            Vector3[] eulers = { new Vector3(0, 0, 0), new Vector3(0, 90, 0), new Vector3(90, 0, 0), new Vector3(90, 90, 0), new Vector3(0, 0, 90), new Vector3(0, 90, 90) };
             Quaternion rot = Quaternion.identity;
-            float h = s.y;
-            if (s.x < s.y && s.x <= s.z) { rot = Quaternion.Euler(0, 0, 90); h = s.x; }
-            else if (s.z < s.y && s.z < s.x) { rot = Quaternion.Euler(90, 0, 0); h = s.z; }
+            float h = s.y, bestScore = float.MaxValue;
+            foreach (var e in eulers)
+            {
+                var q = Quaternion.Euler(e);
+                Vector3 r = new Vector3(
+                    Mathf.Abs((q * Vector3.right).x) * s.x + Mathf.Abs((q * Vector3.up).x) * s.y + Mathf.Abs((q * Vector3.forward).x) * s.z,
+                    Mathf.Abs((q * Vector3.right).y) * s.x + Mathf.Abs((q * Vector3.up).y) * s.y + Mathf.Abs((q * Vector3.forward).y) * s.z,
+                    Mathf.Abs((q * Vector3.right).z) * s.x + Mathf.Abs((q * Vector3.up).z) * s.y + Mathf.Abs((q * Vector3.forward).z) * s.z);
+                float over = 0;
+                if (bag != null) over = Mathf.Max(0, r.x - bag.Spec.Inner.x + 0.01f) + Mathf.Max(0, r.z - bag.Spec.Inner.z + 0.01f);
+                float score = over * 100 + r.y;
+                if (score < bestScore) { bestScore = score; rot = q; h = r.y; }
+            }
             var pos = bottom + Vector3.up * (h / 2);
             it.Rb.position = pos;
             it.Rb.rotation = rot;

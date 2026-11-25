@@ -54,7 +54,14 @@ namespace CatMart
                 {
                     Vector3 pr = root.InverseTransformPoint(mf.transform.TransformPoint(verts[i]));
                     Vector3 q = Normalize(pr, hb);
+                    Vector3 q0 = q;
                     q = DeformNormalized(q, style, hitN, dirN, axis, seed);
+                    // 损坏只会让商品往里皱/凹/压扁，绝不鼓出原来的包围盒（否则会穿出袋子等容器）
+                    for (int a = 0; a < 3; a++)
+                    {
+                        float lim = Mathf.Max(1f, Mathf.Abs(q0[a]));
+                        q[a] = Mathf.Clamp(q[a], -lim, lim);
+                    }
                     pr = Denormalize(q, hb);
                     verts[i] = mf.transform.InverseTransformPoint(root.TransformPoint(pr));
                 }

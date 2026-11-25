@@ -27,6 +27,28 @@ namespace CatMart
         /// <summary>当前最大外推量（米），调试用。</summary>
         public float MaxPush { get { float m = 0; for (int i = 0; i < _n; i++) m = Mathf.Max(m, _push[i]); return m; } }
 
+        /// <summary>诊断：袋壁视觉顶点落在商品碰撞体内部的数量（= 看起来穿模的点）。</summary>
+        public int DebugVertsInsideItems(out string worst)
+        {
+            int count = 0;
+            var tally = new Dictionary<string, int>();
+            for (int i = 0; i < _n; i++)
+            {
+                Vector3 p = transform.TransformPoint(_verts[i]);
+                foreach (var c in Physics.OverlapSphere(p, 0.001f, Physics.AllLayers, QueryTriggerInteraction.Ignore))
+                {
+                    var it = c.GetComponentInParent<GroceryItem>();
+                    if (it == null) continue;
+                    count++;
+                    tally.TryGetValue(it.Def.Name, out int k);
+                    tally[it.Def.Name] = k + 1;
+                    break;
+                }
+            }
+            worst = string.Join(", ", System.Linq.Enumerable.Select(tally, kv => $"{kv.Key}:{kv.Value}"));
+            return count;
+        }
+
         /// <summary>每隔多久重新探测内容物（秒）。</summary>
         const float Interval = 0.12f;
 
@@ -46,7 +68,7 @@ namespace CatMart
         {
             _spec = spec;
             _paper = spec.Material == BagMaterial.Paper;
-            _maxBulge = _paper ? 0.002f : 0.016f;
+            _maxBulge = _paper ? 0.004f : spec.Stretch + 0.006f;   // 能鼓出的上限要覆盖弹性空间
             _thickness = _paper ? 0.0006f : 0.0004f;
             float w = spec.Inner.x, h = spec.Inner.y, d = spec.Inner.z;
             var rest = new List<Vector3>();
@@ -231,10 +253,11 @@ namespace CatMart
             float restAbs = Vector3.Dot(r, outward);
             // 起点在袋壁碰撞体内部（不会打到袋子自己），朝袋子中心发射
             Vector3 originLocal = r;
-            if (g.Axis == 0) originLocal.x = g.Sign * (half + 0.004f); else originLocal.z = g.Sign * (half + 0.004f);
+            float start = half + _spec.Stretch + 0.004f;   // 起点在袋壁碰撞体内部
+            if (g.Axis == 0) originLocal.x = g.Sign * start; else originLocal.z = g.Sign * start;
             Vector3 origin = tr.TransformPoint(originLocal);
             Vector3 dir = tr.TransformDirection(-outward);
-            int n = Physics.RaycastNonAlloc(origin, dir, Hits, half + 0.004f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            int n = Physics.RaycastNonAlloc(origin, dir, Hits, start, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
             float best = float.MaxValue;
             for (int k = 0; k < n; k++)
             {
@@ -245,7 +268,7 @@ namespace CatMart
                 if (Hits[k].distance < best) best = Hits[k].distance;
             }
             if (best == float.MaxValue) return 0f;
-            float contentAbs = half + 0.004f - best + 0.003f; // 商品外沿离中心的距离 + 3mm 余量
+            float contentAbs = start - best + 0.003f; // 商品外沿离中心的距离 + 3mm 余量
             float targetAbs = Mathf.Clamp(contentAbs, restAbs, limit);
             return targetAbs - restAbs;
         }

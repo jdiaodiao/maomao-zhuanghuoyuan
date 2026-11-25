@@ -14,6 +14,8 @@ namespace CatMart
         public float CapacityKg;
         public float MinSharp;      // 尖锐度达到此值才可能刺破
         public float PunctureForce; // 力×尖锐度 超过此值刺破
+        /// <summary>袋壁弹性：碰撞墙比名义尺寸每侧多让出的距离（米）。塑料袋 1.5cm，纸袋 0。</summary>
+        public float Stretch => Material == BagMaterial.Plastic ? 0.015f : 0f;
 
         public string MaterialName => Material == BagMaterial.Paper ? "纸袋" : "塑料袋";
         public string SizeName => Size == BagSize.Small ? "小号" : Size == BagSize.Medium ? "中号" : "大号";
@@ -72,7 +74,8 @@ namespace CatMart
             if (item == null || item.IsDestroyed || !item.gameObject.activeInHierarchy) return false;
             Vector3 p = transform.InverseTransformPoint(item.WorldCom);
             Vector3 h = Spec.Inner * 0.5f;
-            return Mathf.Abs(p.x) <= h.x + 0.01f && Mathf.Abs(p.z) <= h.z + 0.01f && p.y >= -0.02f && p.y <= Spec.Inner.y + 0.18f;
+            float m = 0.01f + Spec.Stretch;
+            return Mathf.Abs(p.x) <= h.x + m && Mathf.Abs(p.z) <= h.z + m && p.y >= -0.02f && p.y <= Spec.Inner.y + 0.18f;
         }
 
         public List<GroceryItem> Contents()
