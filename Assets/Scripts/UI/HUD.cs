@@ -108,7 +108,7 @@ namespace CatMart
         static string ControlsText() =>
             "鼠标 看   WASD 移动   左键按住 抓起商品 / 点袋架取袋 / 点猫铃完成\n" +
             "滚轮 远近   Q/E 水平转   R/F 前后翻   C 侧放   Z 回正   X 收回空袋\n" +
-            "Tab 小票   B 重心标记   Enter 完成订单   H 隐藏帮助   M 静音  -/= 音量   Esc 释放鼠标";
+            "<color=#F2C14E><b>V 俯视装袋</b></color>   Tab 小票   B 重心标记   Enter 完成订单   H 隐藏帮助   M 静音  -/= 音量   Esc 释放鼠标";
 
         // ------------------------------------------------------------ 营业中
         void DrawServingTop()
@@ -162,8 +162,17 @@ namespace CatMart
             GUILayout.Label(sb.ToString(), _small);
             GUILayout.EndArea();
 
-            // 准星
-            if (P != null && P.CursorLocked)
+            // 准星（俯视模式用鼠标指针，不画准星）
+            if (P != null && P.TopView)
+            {
+                float tw = S(980);
+                var tr = new Rect((Screen.width - tw) / 2, Screen.height - S(168), tw, S(44));
+                GUI.Box(tr, GUIContent.none, _panel);
+                GUI.Label(tr, P.Held != null
+                    ? "<b>俯视装袋</b> · 移动鼠标摆放 · 松开左键放下 · 滚轮 抬高/放低 · Q/E R/F C Z 旋转 · 橙圈 = 落点"
+                    : "<b>俯视装袋</b> · 左键按住拿商品 · WASD 平移 · 滚轮 缩放 · 1-4 跳到袋位 · V / Esc 返回第一人称", _center);
+            }
+            else if (P != null && P.CursorLocked)
             {
                 bool hot = P.LookItem != null || P.LookRack != null || P.LookBell || P.Held != null;
                 float cs = S(hot ? 10 : 6);
@@ -236,7 +245,10 @@ namespace CatMart
             }
             if (text == null) return;
             float w = S(560);
-            var r = new Rect(Screen.width / 2f + S(24), Screen.height / 2f + S(24), w, S(130));
+            // 第一人称：准星右下；俯视：固定在右下角，不挡住正在摆放的位置
+            var r = P.TopView
+                ? new Rect(Screen.width - w - S(16), Screen.height - S(300), w, S(130))
+                : new Rect(Screen.width / 2f + S(24), Screen.height / 2f + S(24), w, S(130));
             GUILayout.BeginArea(r, _panel);
             GUILayout.Label(text, _small);
             GUILayout.EndArea();

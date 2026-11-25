@@ -68,6 +68,22 @@ namespace CatMart
             SetView(g.Player, 0, 42);
             g.ShowReceipt = true;
             yield return Shot("2_bagged");
+
+            // 俯视装袋视角
+            g.ShowReceipt = false;
+            g.Player.enabled = true;
+            g.Player.SetTopView(true, false);
+            g.Player.FocusSlot(0);
+            yield return new WaitForSeconds(0.8f);
+            yield return Shot("2b_topview");
+            var extra = ItemFactory.Create(ItemCatalog.Get("cereal"), new Vector3(-0.2f, Layout.CounterTop + 0.2f, 0.22f), Quaternion.identity);
+            g.Player.Grab(extra);
+            yield return new WaitForSeconds(0.8f);
+            yield return Shot("2c_topview_hold");
+            g.Player.Release();
+            Destroy(extra.gameObject);
+            g.Player.SetTopView(false, false);
+            g.Player.enabled = false;
             g.ShowReceipt = false;
 
             g.FinishOrder();
