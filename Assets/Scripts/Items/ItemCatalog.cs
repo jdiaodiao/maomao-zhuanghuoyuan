@@ -168,16 +168,10 @@ namespace CatMart
                 .Cyl("香蕉", 0, 1.8f, 0, 3.6f, 21, 3.6f, "#F2CF3A", 30).Rot(0, 0, 90)
                 .Cyl("香蕉", 0, 1.8f, 3.6f, 3.6f, 20, 3.6f, "#F5D547", 30).Rot(0, 8, 90)
                 .Deco(Shape.Cylinder, 11.5f, 1.8f, 0, 2, 3, 2, "#5D4037").Rot(0, 0, 90).Freq(1.5f);
-            Add("apples", "红苹果 (3磅袋)", Produce, 4.47f, 1.36f, Bruise).Liquid("#FFF3C4")
-                .Ball("苹果", -4, 4, -4, 8, 8, 8, "#C62828", 60)
-                .Ball("苹果", 4, 4, -4, 8, 8, 8, "#B71C1C", 60)
-                .Ball("苹果", -4, 4, 4, 8, 8, 8, "#D32F2F", 60)
-                .Ball("苹果", 4, 4, 4, 8, 8, 8, "#C62828", 60)
-                .Deco(Shape.Box, 0, 8.5f, 0, 4, 1.5f, 2, "#FFEB3B");
-            Add("tomatoes", "番茄 (3个)", Produce, 2.18f, 0.5f, Squish).Liquid("#C62828")
-                .Ball("番茄", -7, 3.5f, 0, 7, 6.5f, 7, "#E53935", 25)
-                .Ball("番茄", 0, 3.5f, 0, 7, 6.5f, 7, "#F44336", 25)
-                .Ball("番茄", 7, 3.5f, 0, 7, 6.5f, 7, "#E53935", 25);
+            Add("apples", "红苹果", Produce, 0.68f, 0.2f, Bruise).Liquid("#FFF3C4").Freq(1.3f)
+                .Ball("苹果", 0, 4, 0, 8, 8, 8, "#C62828", 60);
+            Add("tomatoes", "番茄", Produce, 0.73f, 0.17f, Squish).Liquid("#C62828").Freq(1.3f)
+                .Ball("番茄", 0, 3.25f, 0, 7, 6.5f, 7, "#E53935", 25);
             Add("strawberries", "草莓 (1磅盒)", Produce, 3.97f, 0.45f, Squish).Liquid("#B71C1C")
                 .Body(17, 8, 12, "#E53950", crush: 14, n: "草莓盒").Gloss(0.7f)
                 .Deco(Shape.Box, 0, 8.1f, 0, 17.2f, 0.2f, 12.2f, "#E8F5E9");
@@ -189,11 +183,8 @@ namespace CatMart
             Add("lettuce", "生菜", Produce, 1.78f, 0.6f, Crumple)
                 .BallBody(15, 14, 15, "#7CB342", crush: 25, n: "菜头")
                 .Deco(Shape.Sphere, 0, 9, 0, 11, 9, 11, "#AED581");
-            Add("avocados", "牛油果 (4个袋)", Produce, 3.98f, 0.9f, Bruise)
-                .Ball("牛油果", -4.5f, 4.5f, -3, 7, 9, 7, "#33691E", 70).Rot(0, 0, 90)
-                .Ball("牛油果", 4.5f, 4.5f, -3, 7, 9, 7, "#2E4A1A", 70).Rot(0, 0, 90)
-                .Ball("牛油果", -4.5f, 4.5f, 3, 7, 9, 7, "#33691E", 70).Rot(0, 0, 90)
-                .Ball("牛油果", 4.5f, 4.5f, 3, 7, 9, 7, "#2E4A1A", 70).Rot(0, 0, 90);
+            Add("avocados", "牛油果", Produce, 0.98f, 0.22f, Bruise).Freq(1.2f)
+                .Ball("牛油果", 0, 3.5f, 0, 7, 9, 7, "#33691E", 70).Rot(0, 0, 90);
             Add("potatoes", "土豆 (5磅)", Produce, 3.27f, 2.27f, Bruise)
                 .Body(30, 10, 20, "#A1887F", crush: 800, n: "网袋").Label("#FFEB3B", 0.3f);
             Add("onions", "黄洋葱 (3磅)", Produce, 2.97f, 1.36f, Bruise)
@@ -201,9 +192,8 @@ namespace CatMart
             Add("pineapple", "菠萝", Produce, 2.48f, 1.6f, Bruise).Liquid("#FFEE58")
                 .BallBody(13, 19, 13, "#C68A2B", crush: 400, sharp: 0.5f, n: "果身")
                 .Cone("叶冠", 0, 25, 0, 10, 12, 10, "#558B2F", 300, sharp: 0.85f).Com(0, -2, 0);
-            Add("lemons", "柠檬 (2个)", Produce, 1.16f, 0.25f, Bruise)
-                .Ball("柠檬", -3.6f, 3, 0, 7, 6, 6, "#FDD835", 80)
-                .Ball("柠檬", 3.6f, 3, 0, 7, 6, 6, "#FBC02D", 80);
+            Add("lemons", "柠檬", Produce, 0.58f, 0.12f, Bruise).Freq(1.2f)
+                .Ball("柠檬", 0, 3, 0, 7, 6, 6, "#FDD835", 80);
             Add("carrots", "胡萝卜 (2磅)", Produce, 1.68f, 0.9f, Bruise)
                 .Body(26, 6, 14, "#FB8C00", crush: 300, n: "袋子").Label("#43A047", 0.4f, 0.9f);
 

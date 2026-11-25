@@ -7,6 +7,8 @@ namespace CatMart
     {
         public Transform Left, Right;
         public GroceryItem HoldTarget;
+        /// <summary>按压时爪子要按到的世界坐标点。</summary>
+        public Vector3? PressPoint;
         public bool Walking;
 
         Vector3 _restL = new Vector3(-0.2f, -0.23f, 0.36f);
@@ -91,7 +93,15 @@ namespace CatMart
 
             Vector3 targetR = _restR + new Vector3(0, -bob, 0);
             Quaternion rotR = Quaternion.Euler(15, 8, 0);
-            if (HoldTarget != null && HoldTarget.gameObject.activeInHierarchy)
+            if (PressPoint.HasValue)
+            {
+                // 按压：掌心朝下压在按压点上，轻微颤动表示在用力
+                Vector3 local = cam.InverseTransformPoint(PressPoint.Value + Vector3.up * 0.035f);
+                local.z = Mathf.Clamp(local.z, 0.3f, 1.3f);
+                targetR = local + new Vector3(0, Mathf.Sin(_t * 30f) * 0.002f, -0.02f);
+                rotR = Quaternion.Euler(55, 0, 0);
+            }
+            else if (HoldTarget != null && HoldTarget.gameObject.activeInHierarchy)
             {
                 Vector3 top = HoldTarget.WorldCom + Vector3.up * HoldTarget.Def.Size.y * 0.5f;
                 Vector3 local = cam.InverseTransformPoint(top);

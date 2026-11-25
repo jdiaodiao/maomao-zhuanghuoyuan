@@ -55,11 +55,17 @@ namespace CatMart
         void OnCollisionEnter(Collision c) => HandleCollision(c, true);
         void OnCollisionStay(Collision c) => HandleCollision(c, false);
 
+        /// <summary>最近一次"下方有东西托住"的时间（轻放用来判断已经落到实处）。</summary>
+        public float LastSupportTime = -1f;
+
         void HandleCollision(Collision c, bool enter)
         {
-            if (_grace > 0 || IsDestroyed) return;
             int n = c.contactCount;
             if (n == 0) return;
+            float comY = WorldCom.y;
+            for (int i = 0; i < n; i++)
+                if (c.GetContact(i).point.y < comY - 0.005f) { LastSupportTime = Time.time; break; }
+            if (_grace > 0 || IsDestroyed) return;
             float dt = Time.fixedDeltaTime;
             float perContact = c.impulse.magnitude / n;
             if (perContact <= 0) return;

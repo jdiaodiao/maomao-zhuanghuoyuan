@@ -106,7 +106,7 @@ namespace CatMart
         }
 
         static string ControlsText() =>
-            "鼠标 看   WASD 移动   左键按住 抓起商品 / 点袋架取袋 / 点猫铃完成\n" +
+            "鼠标 看   WASD 移动   左键按住 抓起（松开=轻放，Shift+松开=扔下）   <color=#F2C14E>右键按住 按压</color>（圆圈变红就停）\n" +
             "滚轮 远近   Q/E 水平转   R/F 前后翻   C 侧放   Z 回正   X 收回空袋\n" +
             "<color=#F2C14E><b>V 俯视装袋</b></color>   Tab 小票   B 重心标记   Enter 完成订单   H 隐藏帮助   M 静音  -/= 音量   Esc 释放鼠标";
 
@@ -169,8 +169,8 @@ namespace CatMart
                 var tr = new Rect((Screen.width - tw) / 2, Screen.height - S(168), tw, S(44));
                 GUI.Box(tr, GUIContent.none, _panel);
                 GUI.Label(tr, P.Held != null
-                    ? "<b>俯视装袋</b> · 移动鼠标摆放 · 松开左键放下 · 滚轮 抬高/放低 · Q/E R/F C Z 旋转 · 橙圈 = 落点"
-                    : "<b>俯视装袋</b> · 左键按住拿商品 · WASD 平移 · 滚轮 缩放 · 1-4 袋位 · 5 购物车 · V / Esc 返回第一人称", _center);
+                    ? "<b>俯视装袋</b> · 移动鼠标摆放 · 松开=轻放到底 · Shift+松开=扔下 · 滚轮 抬高/放低 · Q/E R/F C Z 旋转"
+                    : "<b>俯视装袋</b> · 左键拿 · 右键按压 · WASD 平移 · 滚轮 缩放 · 1-4 袋位 · 5 购物车 · V/Esc 返回", _center);
             }
             else if (P != null && P.CursorLocked)
             {

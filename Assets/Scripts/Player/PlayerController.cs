@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace CatMart
@@ -70,18 +71,48 @@ namespace CatMart
 
             if (Input.GetKeyDown(KeyCode.V)) SetTopView(!TopView, true);
 
+            // 按压持续中：力度逐渐加大，计算附近商品的危险程度
+            if (_pressItem != null)
+            {
+                if (!(Input.GetMouseButton(1) || _debugPressing) || _pressItem.IsDestroyed || !_pressItem.gameObject.activeInHierarchy) EndPress();
+                else
+                {
+                    PressRisk = NearbyRisk(PressPoint);
+                    if (PressRisk < RiskStop)
+                    {
+                        // 先慢后快：0.5 秒≈1N，1 秒≈5N，3 秒到最大力
+                        _pressTime += Time.deltaTime;
+                        PressForce = Mathf.Min(PressMax, PressMax * Mathf.Pow(_pressTime / PressRampTime, 2));
+                    }
+                    else
+                    {
+                        // 圆圈变红：不再加力，并稍微松一点，避免把东西压坏
+                        PressForce = Mathf.Max(0, PressForce - PressForce * 0.6f * Time.deltaTime);
+                        _pressTime = PressRampTime * Mathf.Sqrt(PressForce / PressMax);
+                    }
+                }
+            }
+
             if (TopView) UpdateTopView();
             else if (!UpdateFirstPerson()) return;
 
             // ---------------- 交互（两种视角共用）----------------
-            if (Input.GetMouseButtonDown(0) && GUIUtility.hotControl == 0)
+            if (Input.GetMouseButtonDown(0) && GUIUtility.hotControl == 0 && !Placing && _pressItem == null)
             {
                 if (LookItem != null && !LookItem.IsDestroyed) Grab(LookItem);
                 else if (LookRack != null) GameManager.I.SpawnBag(LookRack.Spec);
                 else if (LookBell) GameManager.I.FinishOrder();
                 else if (Paws != null && !TopView) Paws.Swipe();
             }
-            if (Input.GetMouseButtonUp(0) && Held != null) Release();
+            // 松开左键 = 轻放（手带着商品慢慢往下伸，碰到东西才松开）；按住 Shift 松开 = 直接扔下
+            if (Input.GetMouseButtonUp(0) && Held != null && !Placing)
+            {
+                if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) Release();
+                else BeginPlace();
+            }
+
+            // 右键按住 = 用爪子往下按压（只在空手时）
+            if (Input.GetMouseButtonDown(1) && Held == null && LookItem != null && !LookItem.IsDestroyed) BeginPress(LookItem, _lookPoint);
 
             if (Held != null)
             {
@@ -215,30 +246,139 @@ namespace CatMart
             return 0f;
         }
 
-        // ---------------- 落点标记（俯视时显示商品正下方会落在哪）----------------
-        GameObject _marker;
 
-        void UpdateDropMarker()
+        // ================================================================ 轻放
+        /// <summary>正在轻放：手带着商品慢慢往下伸，碰到东西就松开。</summary>
+        public bool Placing { get; private set; }
+        Vector2 _placeXZ;
+        float _placeTime;
+        int _placeStill;
+
+        /// <summary>测试/外部调用：轻放手里的商品。</summary>
+        public void PlaceGently() => BeginPlace();
+        /// <summary>测试用：开始按压某件商品。</summary>
+        public void DebugPress(GroceryItem item, Vector3 point) { _debugPressing = true; BeginPress(item, point); }
+        bool _debugPressing;
+        public void DebugEndPress() { _debugPressing = false; EndPress(); }
+
+        void BeginPlace()
         {
-            bool show = TopView && Held != null && ViewBlend > 0.9f;
-            if (!show) { if (_marker != null) _marker.SetActive(false); return; }
-            if (_marker == null)
+            if (Held == null) return;
+            Placing = true;
+            var com = Held.WorldCom;
+            _placeXZ = new Vector2(com.x, com.z);
+            _placeTime = 0;
+            _placeStill = 0;
+        }
+
+        void FinishPlace()
+        {
+            if (Held == null) { Placing = false; return; }
+            var rb = Held.Rb;
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            Placing = false;
+            Release();
+            Sfx.Play("thud", 0.25f);
+        }
+
+        // ================================================================ 按压
+        public const float PressMax = 45f;     // 猫爪最大按压力（N）
+        const float PressRampTime = 3f;        // 从 0 加到最大力需要的时间（秒，先慢后快）
+        /// <summary>风险达到这个值（圆圈变红）就停止加力。</summary>
+        public const float RiskStop = 0.85f;
+        float _pressTime;
+        GroceryItem _pressItem;
+        Vector3 _pressLocal;
+        public float PressForce { get; private set; }
+        /// <summary>附近商品中最高的承压比例（0~1+），用于圆圈颜色。</summary>
+        public float PressRisk { get; private set; }
+        public bool Pressing => _pressItem != null;
+        public Vector3 PressPoint => _pressItem != null ? _pressItem.transform.TransformPoint(_pressLocal) : Vector3.zero;
+
+        void BeginPress(GroceryItem item, Vector3 point)
+        {
+            _pressItem = item;
+            _pressLocal = item.transform.InverseTransformPoint(point);
+            PressForce = 0;
+            _pressTime = 0;
+            PressRisk = 0;
+            item.Rb.WakeUp();
+        }
+
+        void EndPress()
+        {
+            _pressItem = null;
+            PressForce = 0;
+            if (Paws != null) Paws.PressPoint = null;
+        }
+
+        /// <summary>按压点附近（同一个袋子/一摞）所有商品里，最危险的部件承压比例。</summary>
+        static float NearbyRisk(Vector3 p)
+        {
+            float risk = 0;
+            foreach (var it in GroceryItem.Active)
             {
-                _marker = new GameObject("落点标记");
+                if (it.IsDamaged || it.IsDestroyed) continue;
+                Vector3 c = it.WorldCom;
+                if (new Vector2(c.x - p.x, c.z - p.z).magnitude > 0.3f || c.y > p.y + 0.05f) continue;
+                foreach (var part in it.Parts) risk = Mathf.Max(risk, part.LoadRatio);
+            }
+            return risk;
+        }
+
+        public static Color RiskColor(float risk) =>
+            risk < 0.5f ? Color.Lerp(new Color(0.3f, 0.95f, 0.4f), new Color(1f, 0.85f, 0.15f), risk / 0.5f)
+            : risk < 0.85f ? Color.Lerp(new Color(1f, 0.85f, 0.15f), new Color(1f, 0.45f, 0.1f), (risk - 0.5f) / 0.35f)
+            : new Color(1f, 0.15f, 0.1f);
+
+        // ================================================================ 圆圈（第一人称和俯视都有）
+        GameObject _ring;
+        MeshRenderer _ringR;
+        readonly Dictionary<int, Material> _ringMats = new Dictionary<int, Material>();
+
+        Material RingMat(Color c)
+        {
+            int key = Mathf.RoundToInt(c.r * 20) * 10000 + Mathf.RoundToInt(c.g * 20) * 100 + Mathf.RoundToInt(c.b * 20);
+            if (!_ringMats.TryGetValue(key, out var m)) { m = Mats.Emissive(c, c * 1.3f); _ringMats[key] = m; }
+            return m;
+        }
+
+        void UpdateRing()
+        {
+            if (_ring == null)
+            {
+                _ring = new GameObject("黄色圆圈");
                 var v = new VisualSet();
-                v.Add(Shapes.Torus(0.5f, 0.035f, 40, 6), Mats.Emissive(new Color(1f, 0.55f, 0.15f), new Color(1.2f, 0.6f, 0.15f)));
-                v.Add(Shapes.Disc(0.47f, 40), new Vector3(0, -0.01f, 0), Quaternion.identity, Mats.Glass(new Color(1f, 0.6f, 0.2f), 0.25f, 0.3f));
-                v.Spawn(_marker.transform, "环", default, null, false);
+                v.Add(Shapes.Torus(0.5f, 0.045f, 48, 6), RingMat(Color.yellow));
+                _ringR = v.Spawn(_ring.transform, "环", default, null, false).GetComponent<MeshRenderer>();
             }
-            Vector3 com = Held.WorldCom;
-            if (Physics.Raycast(com, Vector3.down, out var hit, 2f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            Vector3? at = null;
+            float r = 0.05f;
+            Color col = new Color(1f, 0.85f, 0.15f);
+            if (Pressing)
             {
-                _marker.SetActive(true);
-                _marker.transform.position = hit.point + Vector3.up * 0.003f;
-                float r = Mathf.Clamp(Mathf.Max(Held.Def.Size.x, Held.Def.Size.z) * 0.6f, 0.03f, 0.25f);
-                _marker.transform.localScale = new Vector3(r, 1, r);
+                at = PressPoint;
+                r = Mathf.Lerp(0.03f, 0.07f, PressForce / PressMax);
+                col = RiskColor(PressRisk);
             }
-            else _marker.SetActive(false);
+            else if (Held != null)
+            {
+                Vector3 com = Held.WorldCom;
+                if (Physics.Raycast(com, Vector3.down, out var hit, 2f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                {
+                    at = hit.point;
+                    r = Mathf.Clamp(Mathf.Max(Held.Def.Size.x, Held.Def.Size.z) * 0.6f, 0.03f, 0.25f);
+                    // 下方商品的承压情况也会体现在圆圈颜色上
+                    float risk = NearbyRisk(hit.point + Vector3.up * 0.02f);
+                    col = risk > 0.5f ? RiskColor(risk) : new Color(1f, 0.85f, 0.15f);
+                }
+            }
+            if (!at.HasValue) { _ring.SetActive(false); return; }
+            _ring.SetActive(true);
+            _ring.transform.position = at.Value + Vector3.up * 0.004f;
+            _ring.transform.localScale = new Vector3(r, 1, r);
+            _ringR.sharedMaterial = RingMat(col);
         }
 
         float HeldHalfHeight()
@@ -288,7 +428,8 @@ namespace CatMart
 
             Cam.transform.SetPositionAndRotation(Vector3.Lerp(fpPos, topPos, s), Quaternion.Slerp(fpRot, topRot, s));
             if (Paws != null) Paws.gameObject.SetActive(ViewBlend < 0.5f);
-            UpdateDropMarker();
+            UpdateRing();
+            if (Paws != null) Paws.PressPoint = Pressing ? PressPoint : (Vector3?)null;
         }
 
         void ClearLook()
@@ -296,10 +437,13 @@ namespace CatMart
             LookItem = null; LookBag = null; LookRack = null; LookBell = false;
         }
 
+        Vector3 _lookPoint;
+
         void UpdateLook(Ray ray, float dist)
         {
             ClearLook();
             if (!Physics.Raycast(ray, out var hit, dist, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) return;
+            _lookPoint = hit.point;
             LookItem = hit.collider.GetComponentInParent<GroceryItem>();
             if (LookItem != null) return;
             LookRack = hit.collider.GetComponent<BagRackButton>();
@@ -341,21 +485,48 @@ namespace CatMart
             Held.Held = false;
             Held = null;
             _hasTopTarget = false;
+            Placing = false;
             if (Paws != null) Paws.HoldTarget = null;
         }
 
         void FixedUpdate()
         {
+            // ---- 按压：爪子在按压点施加向下的力（也算作该部件的承压）
+            if (_pressItem != null && PressForce > 0)
+            {
+                Vector3 p = PressPoint;
+                _pressItem.Rb.AddForceAtPosition(Vector3.down * PressForce, p, ForceMode.Force);
+                ItemPart nearest = null; float best = float.MaxValue;
+                foreach (var part in _pressItem.Parts)
+                {
+                    if (part.Col == null || !part.Col.enabled) continue;
+                    float dd = (part.Col.ClosestPoint(p) - p).sqrMagnitude;
+                    if (dd < best) { best = dd; nearest = part; }
+                }
+                if (nearest != null) { nearest.LastPoint = p; nearest.LastNormal = Vector3.up; nearest.AddLoad(PressForce); }
+            }
+
             if (Held == null) return;
-            if (Held.IsDestroyed || !Held.gameObject.activeInHierarchy) { Release(); return; }
+            if (Held.IsDestroyed || !Held.gameObject.activeInHierarchy) { Placing = false; Release(); return; }
             var rb = Held.Rb;
             Vector3 target;
-            if (TopView) target = _hasTopTarget ? _topTarget : rb.worldCenterOfMass;
+            if (Placing)
+            {
+                // 轻放：保持水平位置，慢慢往下（约 0.25m/s），停住了就松开
+                _placeTime += Time.fixedDeltaTime;
+                Vector3 com = rb.worldCenterOfMass;
+                target = new Vector3(_placeXZ.x, com.y - 0.03f, _placeXZ.y);
+                // 落到实处：下方出现支撑接触（连续几帧），或者已经停住不动
+                bool supported = Time.time - Held.LastSupportTime < 0.03f;
+                if (_placeTime > 0.06f && (supported || rb.linearVelocity.y > -0.02f)) _placeStill++; else _placeStill = 0;
+                if (_placeStill >= 3 || _placeTime > 2f) { FinishPlace(); return; }
+            }
+            else if (TopView) target = _hasTopTarget ? _topTarget : rb.worldCenterOfMass;
             else target = Cam.transform.position + Cam.transform.forward * _holdDist;
             Vector3 err = target - rb.worldCenterOfMass;
 
             // 卡住太远自动松手（俯视时鼠标移动快，放宽一些）
-            if (err.magnitude > (TopView ? 1.5f : 0.7f)) { Release(); return; }
+            if (!Placing && err.magnitude > (TopView ? 1.5f : 0.7f)) { Release(); return; }
 
             float m = rb.mass;
             const float k = 320f;

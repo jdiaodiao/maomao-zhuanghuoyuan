@@ -86,8 +86,13 @@ namespace CatMart
             yield return new WaitForSeconds(0.6f);
             yield return Shot("2c_topview_hold");
             yield return new WaitForSeconds(2.5f);
-            g.Player.Release();
+            // 轻放：手带着罐头往下伸，碰到东西才松开
+            float yBefore = extra.WorldCom.y;
+            g.Player.PlaceGently();
+            float pt = 0;
+            while (g.Player.Placing && pt < 3f) { pt += Time.deltaTime; yield return null; }
             g.Player.DebugTopTarget = null;
+            Log($"轻放测试: 下降 {(yBefore - extra.WorldCom.y) * 100:0.0}cm 用时 {pt:0.00}s 松手时速度 {extra.Rb.linearVelocity.magnitude:0.00}m/s (期望 <0.1)");
             yield return new WaitForSeconds(1.5f);
             Log($"轨迹测试: 罐头从台面越过袋壁放进1号袋 inBag={bag1.Contains(extra)} damaged={extra.IsDamaged} pos={extra.transform.position} (期望 inBag=True)");
             yield return Shot("2d_topview_placed");
@@ -140,6 +145,27 @@ namespace CatMart
             Log($"破坏测试: 牛奶 damaged={milk.IsDamaged} 罐头 damaged={soup.IsDamaged} (期望 False)");
             Log($"破坏测试: 竹签+洗衣液压在塑料袋里 torn={bag.Torn} (期望 True)");
             yield return Shot("4_damage");
+
+            // 按压测试：结实的一摞（罐头压在米袋上）按 2 秒不该坏；罐头压在薯片上按一下就会变红并压坏
+            var rice = ItemFactory.Create(ItemCatalog.Get("rice"), new Vector3(1.0f, top0 + 0.05f, 0.25f), Quaternion.identity);
+            var chips2 = ItemFactory.Create(ItemCatalog.Get("chips"), new Vector3(1.0f, top0 + 0.05f, -0.05f), Quaternion.Euler(90, 0, 0));
+            yield return new WaitForSeconds(0.8f);
+            var canA = ItemFactory.Create(ItemCatalog.Get("canned_beans"), new Vector3(1.0f, top0 + 0.17f, 0.25f), Quaternion.identity);
+            var canB = ItemFactory.Create(ItemCatalog.Get("tissues"), new Vector3(1.0f, top0 + 0.16f, -0.05f), Quaternion.identity);
+            yield return new WaitForSeconds(1.0f);
+            g.Player.enabled = true;
+            float maxRisk = 0;
+            g.Player.DebugPress(canA, canA.WorldCom + Vector3.up * 0.05f);
+            for (float t2 = 0; t2 < 2f; t2 += Time.deltaTime) { maxRisk = Mathf.Max(maxRisk, g.Player.PressRisk); yield return null; }
+            Log($"按压测试: 罐头压米袋 2秒 力 {g.Player.PressForce:0}N 最高风险 {maxRisk:0.00} 米袋坏={rice.IsDamaged} (期望 False)");
+            g.Player.DebugEndPress();
+            maxRisk = 0;
+            Log($"按压前: 薯片坏={chips2.IsDamaged} 薯片受压={chips2.Parts[0].LoadRatio:0.00}");
+            g.Player.DebugPress(canB, canB.WorldCom + Vector3.up * 0.05f);
+            for (float t2 = 0; t2 < 4f; t2 += Time.deltaTime) { maxRisk = Mathf.Max(maxRisk, g.Player.PressRisk); if (Time.frameCount % 25 == 0) Log($"  t={t2:0.00} F={g.Player.PressForce:0.0} risk={g.Player.PressRisk:0.00} chipsLoad={chips2.Parts[0].Load:0.0} dmg={chips2.IsDamaged}"); yield return null; }
+            Log($"按压测试: 抽纸压薯片 力 {g.Player.PressForce:0}N 最高风险 {maxRisk:0.00} 薯片坏={chips2.IsDamaged} (期望 风险停在0.85附近 且 薯片没坏=False)");
+            g.Player.DebugEndPress();
+            g.Player.enabled = false;
 
             // 5) 各商品外观总览
             g.NextCustomer();

@@ -76,7 +76,7 @@ namespace CatMart
             {
                 var d = ItemFactory.RandomDef(rng, x =>
                     (!x.Bulky || (!bulkyUsed && customerIndex >= 1)) &&
-                    (!counts.TryGetValue(x.Id, out int c) || c < 2));
+                    (!counts.TryGetValue(x.Id, out int c) || c < (x.Category == ItemCategory.Produce && x.Mass < 0.3f ? 3 : 2)));
                 if (d.Bulky) bulkyUsed = true;
                 counts[d.Id] = counts.TryGetValue(d.Id, out int cc) ? cc + 1 : 1;
                 o.Items.Add(d);
