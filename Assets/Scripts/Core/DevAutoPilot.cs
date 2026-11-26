@@ -25,6 +25,13 @@ namespace CatMart
 
             g.ResetProgress();
             g.StartDay();
+            // 关卡：4 单，最后一单是记忆单，只出前几单见过的商品
+            {
+                var seen = new HashSet<ItemDefinition>(g.DayOrders.Take(GameManager.CustomersPerDay - 1).SelectMany(o => o.Items));
+                var mem = g.DayOrders.Last();
+                Log($"关卡: 第{g.Day}关 {g.DayOrders.Count}单 目标 {g.DayGoal:0.00} 各单件数 [{string.Join(",", g.DayOrders.Select(o => o.Items.Count))}] " +
+                    $"记忆单={mem.Memory} 记忆单商品都见过={mem.Items.All(seen.Contains)} 第1单提示={g.TraitHints}");
+            }
             var cam = g.Player.Cam;
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-onlyTip") >= 0)
             {
@@ -112,6 +119,7 @@ namespace CatMart
             var r = g.LastResult;
             Log($"结算: 倍率 {r.Multiplier:0.00} (规格{r.ReqFactor} 平衡{r.BalanceFactor:0.00} 耐心{r.PatienceFactor:0.00} 漏装{r.MissingFactor:0.00}) 工钱 {r.Pay:0.00} 赔偿 {r.DamagePenalty:0.00} 实得 {r.Net:0.00} 星 {r.Stars}");
             Log($"  规格: {r.ReqNote}; 漏装: {string.Join(",", r.MissingNames)}; 损坏: {string.Join(",", r.DamagedNames)}");
+            Log($"  小费: {r.Tip:0.00} 档{r.TipTier} {r.TipNote}; 今日 {g.DayEarned:0.00}/{g.DayGoal:0.00}");
             foreach (var b in r.Bags) Log($"  袋 {b.Spec.Name} {b.ItemCount}件 {b.Mass:0.0}kg 偏心{b.Imbalance:0.00} x{b.Factor:0.00} {b.Note}");
             yield return new WaitForSeconds(0.5f);
             yield return Shot("3_settlement");
@@ -229,8 +237,54 @@ namespace CatMart
             yield return new WaitForSeconds(0.2f);
             yield return Shot("8_cat");
 
+            yield return LevelTest(g);
             Log("自动测试完成");
             Application.Quit();
+        }
+
+        /// <summary>关卡流程：跳到记忆单 → 结算 → 当日结算（没达标 / 达标）。</summary>
+        IEnumerator LevelTest(GameManager g)
+        {
+            g.Player.enabled = true;
+            HUD.Hidden = false;
+            g.DebugJumpTo(GameManager.CustomersPerDay - 1);
+            Time.timeScale = 3f;
+            float t = 0;
+            int moved = 0;
+            while (!g.Store.Feeder.Done && t < 40f)
+            {
+                t += Time.unscaledDeltaTime;
+                // 传送带末端堵住会停带：把到了末端的商品挪到打包台上（排成一排）
+                foreach (var it in g.OrderItems)
+                    if (it != null && !it.Rb.isKinematic && it.transform.position.x > Layout.BeltEndX - 0.45f && it.transform.position.x < Layout.BeltEndX + 0.2f)
+                    {
+                        it.Rb.isKinematic = true;
+                        it.transform.position = new Vector3(-0.5f + (moved % 6) * 0.25f, Layout.CounterTop + it.Def.Size.y / 2 + 0.01f, 0.32f - (moved / 6) * 0.25f);
+                        it.transform.rotation = Quaternion.identity;
+                        moved++;
+                    }
+                yield return null;
+            }
+            Time.timeScale = 1f;
+            yield return new WaitForSeconds(1.5f);
+            g.Player.transform.position = new Vector3(-0.6f, 0, -0.6f);
+            SetView(g.Player, -40, 35);
+            Log($"记忆单: memory={g.IsMemoryOrder} 提示={g.TraitHints} 光边开着={g.Player.Cam.GetComponent<ItemOutlines>().enabled && g.TraitHints}");
+            yield return Shot("10_memory");
+            g.FinishOrder();
+            yield return null;
+            Log($"记忆单结算: 倍率 {g.LastResult.Multiplier:0.00} 记忆×{g.LastResult.MemoryFactor:0.00} 小费 {g.LastResult.Tip:0.00} ({g.LastResult.TipNote}) 实得 {g.LastResult.Net:0.00}");
+            yield return Shot("11_settle_memory");
+            g.NextCustomer();
+            yield return null;
+            Log($"当日结算: phase={g.Phase} 今日 {g.DayEarned:0.00}/{g.DayGoal:0.00} 过关={g.DayPassed}");
+            yield return Shot("12_day_summary");
+            int day0 = g.Day;
+            if (!g.DayPassed) g.DebugAddEarned(g.DayGoal - g.DayEarned + 1f);
+            yield return Shot("12b_day_pass");
+            g.EndDayAndContinue();
+            yield return null;
+            Log($"下一关: 第{g.Day}关 (之前 {day0}) 钱包 {g.Money:0.00} 目标 {g.DayGoal:0.00}");
         }
 
         IEnumerator TipTest(GameManager g)

@@ -15,6 +15,8 @@ namespace CatMart
         public Dictionary<BagSize, int> Bags = new Dictionary<BagSize, int>();
         public float PatienceSeconds;
         public int Seed;
+        /// <summary>记忆单：没有光边和属性说明，商品都是今天前几单出现过的。</summary>
+        public bool Memory;
 
         public float ItemsTotal => Items.Sum(i => i.Price);
         public int BagCount => Bags.Values.Sum();
@@ -57,7 +59,8 @@ namespace CatMart
         };
 
         /// <summary>按难度生成一张订单。customerIndex 从 0 开始。</summary>
-        public static CustomerOrder Generate(int ticket, int customerIndex, int seed)
+        /// <param name="pool">不为空时只从这些商品里挑（记忆单：只出今天前几单出现过的商品）。</param>
+        public static CustomerOrder Generate(int ticket, int customerIndex, int seed, ICollection<ItemDefinition> pool = null)
         {
             var rng = new System.Random(seed);
             var o = new CustomerOrder
@@ -74,9 +77,12 @@ namespace CatMart
             var counts = new Dictionary<string, int>();
             while (o.Items.Count < count)
             {
-                var d = ItemFactory.RandomDef(rng, x =>
+                System.Func<ItemDefinition, bool> ok = x =>
+                    (pool == null || pool.Contains(x)) &&
                     (!x.Bulky || (!bulkyUsed && customerIndex >= 1)) &&
-                    (!counts.TryGetValue(x.Id, out int c) || c < (x.Category == ItemCategory.Produce && x.Mass < 0.3f ? 3 : 2)));
+                    (!counts.TryGetValue(x.Id, out int c) || c < (x.Category == ItemCategory.Produce && x.Mass < 0.3f ? 3 : 2));
+                if (!ItemCatalog.All.Any(ok)) break; // 记忆单的候选用完了
+                var d = ItemFactory.RandomDef(rng, ok);
                 if (d.Bulky) bulkyUsed = true;
                 counts[d.Id] = counts.TryGetValue(d.Id, out int cc) ? cc + 1 : 1;
                 o.Items.Add(d);

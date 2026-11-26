@@ -135,7 +135,9 @@ namespace CatMart
                 // 卡通风：不用法线贴图；灰度细节贴图只保留一点点，彩色贴图（果皮、面包等）保留颜色
                 bool colorTex = albedo != null && c.r > 0.95f && c.g > 0.95f && c.b > 0.95f;
                 float detail = albedo == null ? 0 : colorTex ? 0.85f : 0.3f;
-                m = CozyNew("CozyMat", colorTex ? c : ArtStyle.Pastel(c), albedo, detail, smooth * 0.45f + metallic * 0.25f, tile);
+                // 彩色贴图换成“手绘色块”版本（去掉写实的细碎纹理）
+                Texture tex = colorTex && albedo is Texture2D t2 ? TexGen.Cozify(t2) : albedo;
+                m = CozyNew("CozyMat", colorTex ? c : ArtStyle.Pastel(c), tex, detail, smooth * 0.45f + metallic * 0.25f, tile);
                 Named[key] = m;
                 return m;
             }

@@ -4,14 +4,21 @@ using UnityEngine;
 
 namespace CatMart
 {
-    /// <summary>第一章流程：开店 → 顾客1..N → 当日结算。</summary>
+    /// <summary>
+    /// 第一章流程（关卡模式）：每天 = 一关。开店 → 顾客 1..4 → 当日结算。
+    /// 今日收入达到目标金额才算过关（收入存进钱包，解锁下一天）；没达到就重来这一天。
+    /// 每天最后一位顾客是“记忆单”：没有光边和属性说明，商品都是今天前几单出现过的。
+    /// </summary>
     public class GameManager : MonoBehaviour
     {
         public static GameManager I { get; private set; }
 
         public enum State { Intro, Serving, Settlement, DaySummary }
 
-        public const int CustomersPerDay = 5;
+        public const int CustomersPerDay = 4;
+
+        /// <summary>目标金额 = 今天所有订单的基础工钱 × 这个比例（越往后越高）。</summary>
+        public static float GoalRatio(int day) => Mathf.Min(1.35f, 0.9f + 0.1f * (day - 1));
         const string MoneyKey = "CatMart.Money";
         const string DayKey = "CatMart.Day";
 
@@ -31,8 +38,17 @@ namespace CatMart
         public float Patience01 => PatienceMax > 0 ? Mathf.Clamp01(Patience / PatienceMax) : 0;
         public bool ShowReceipt;
         public bool ShowHelp = true;
-        /// <summary>属性提示（商品光边 + 悬停属性说明）。以后难的关卡（比如每天最后一位顾客）可以关掉，靠记忆。</summary>
+        /// <summary>属性提示（商品光边 + 悬停属性说明）。记忆单关掉，靠记忆。</summary>
         public bool TraitHints = true;
+
+        /// <summary>今天的订单（开店时一次生成好，目标金额按它们算）。</summary>
+        public readonly List<CustomerOrder> DayOrders = new List<CustomerOrder>();
+        public float DayGoal { get; private set; }
+        public float DayEarned { get; private set; }
+        public bool DayPassed => DayEarned >= DayGoal - 0.001f;
+        public bool IsMemoryOrder => Order != null && Order.Memory;
+        /// <summary>下一位顾客是不是记忆单（结算界面提前告诉玩家）。</summary>
+        public bool NextIsMemory => CustomerIndex < DayOrders.Count && DayOrders[CustomerIndex].Memory;
 
         public readonly Bag[] Slots = new Bag[4];
         int _ticket = 1;
@@ -63,7 +79,27 @@ namespace CatMart
         {
             CustomerIndex = 0;
             DayResults.Clear();
+            DayEarned = 0;
+            GenerateDayOrders();
             NextCustomer();
+        }
+
+        /// <summary>一次生成今天的 4 单；最后一单只从前几单出现过的商品里挑。</summary>
+        void GenerateDayOrders()
+        {
+            DayOrders.Clear();
+            var seen = new HashSet<ItemDefinition>();
+            int daySeed = Day * 7919 + Random.Range(0, 100000);
+            for (int i = 0; i < CustomersPerDay; i++)
+            {
+                bool memory = i == CustomersPerDay - 1;
+                var o = OrderGenerator.Generate(_ticket++, i, daySeed + i * 131, memory ? seen : null);
+                o.Memory = memory;
+                foreach (var d in o.Items) seen.Add(d);
+                DayOrders.Add(o);
+            }
+            float basePay = DayOrders.Sum(o => o.ItemsTotal * Settlement.Commission * (o.Memory ? Settlement.MemoryBonus : 1f));
+            DayGoal = Mathf.Max(1f, Mathf.Round(basePay * GoalRatio(Day) * 2f) / 2f); // 取整到 $0.5
         }
 
         public void NextCustomer()
@@ -78,8 +114,10 @@ namespace CatMart
                 return;
             }
 
-            int seed = Day * 7919 + CustomerIndex * 131 + Random.Range(0, 100000);
-            Order = OrderGenerator.Generate(_ticket++, CustomerIndex, seed);
+            if (DayOrders.Count != CustomersPerDay) GenerateDayOrders();
+            Order = DayOrders[CustomerIndex];
+            int seed = Order.Seed;
+            TraitHints = !Order.Memory;
             var c = Store.Customer;
             c.gameObject.SetActive(true);
             c.SetFur(Order.Fur);
@@ -93,6 +131,7 @@ namespace CatMart
             Player.InputEnabled = true;
             PlayerController.LockCursor(true);
             Sfx.Play("meow", 0.8f);
+            if (Order.Memory) ShowToast("记忆单！这一单没有光边和属性说明，商品都是今天见过的，靠记忆喵", 5f);
         }
 
         public void FinishOrder()
@@ -105,11 +144,9 @@ namespace CatMart
             }
             Player.Release();
             LastResult = Settlement.Evaluate(Order, OrderItems, Slots.Where(b => b != null).ToList(),
-                it => StoreBuilder.InCart(Store.Cart, it), Patience01);
+                it => StoreBuilder.InCart(Store.Cart, it), Patience01, Order.Memory);
             DayResults.Add(LastResult);
-            Money += LastResult.Net;
-            PlayerPrefs.SetFloat(MoneyKey, Money);
-            PlayerPrefs.Save();
+            DayEarned += LastResult.Net;
 
             Phase = State.Settlement;
             Player.InputEnabled = false;
@@ -121,18 +158,30 @@ namespace CatMart
             CustomerIndex++;
         }
 
+        /// <summary>今日结算界面的按钮：过关 → 收入存进钱包，进入下一天；没过 → 重来这一天（这天的收入作废）。</summary>
         public void EndDayAndContinue()
         {
-            Day++;
-            PlayerPrefs.SetInt(DayKey, Day);
-            PlayerPrefs.Save();
+            if (DayPassed)
+            {
+                Money += DayEarned;
+                Day++;
+                PlayerPrefs.SetFloat(MoneyKey, Money);
+                PlayerPrefs.SetInt(DayKey, Day);
+                PlayerPrefs.Save();
+            }
             StartDay();
         }
+
+        // 自动测试用
+        public void DebugJumpTo(int customerIndex) { CustomerIndex = customerIndex; NextCustomer(); }
+        public void DebugAddEarned(float v) => DayEarned += v;
 
         public void ResetProgress()
         {
             Money = 0;
             Day = 1;
+            DayEarned = 0;
+            DayOrders.Clear();
             PlayerPrefs.DeleteKey(MoneyKey);
             PlayerPrefs.DeleteKey(DayKey);
         }

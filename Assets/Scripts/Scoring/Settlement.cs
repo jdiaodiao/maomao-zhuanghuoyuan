@@ -27,7 +27,13 @@ namespace CatMart
         public bool ReqMatch;
         public string ReqNote;
         public int Missing;
-        public float TipFactor = 1f;
+        public float ToppleFactor = 1f;
+        /// <summary>小费（按顾客剩余耐心分档；弄坏/漏装就没有）。</summary>
+        public float Tip;
+        public int TipTier;            // 0 = 没有，1..3 = 档次
+        public string TipNote;
+        /// <summary>记忆单（没有属性提示）的奖励倍率。</summary>
+        public float MemoryFactor = 1f;
         public List<string> TippedNames = new List<string>();
         public List<string> MissingNames = new List<string>();
         public List<string> DamagedNames = new List<string>();
@@ -42,6 +48,18 @@ namespace CatMart
         public const float UnstablePerItem = 0.8f, UnstableFloor = 0.4f;
         /// <summary>每件翻倒的"不能倒"商品，总倍率 ×0.75，最低 ×0.4。</summary>
         public const float TippedPerItem = 0.75f, TippedFloor = 0.4f;
+        /// <summary>记忆单（每天最后一位顾客，没有光边和属性说明）的奖励倍率。</summary>
+        public const float MemoryBonus = 1.2f;
+        /// <summary>顾客等到没耐心了 → 工钱 ×0.85。</summary>
+        public const float ImpatientFactor = 0.85f;
+
+        /// <summary>小费档次：剩余耐心 ≥ Min 时给 订单总价 × Rate 的小费。</summary>
+        public static readonly (float Min, float Rate, string Name)[] TipTiers =
+        {
+            (0.5f, 0.05f, "超快！大方的小费"),
+            (0.25f, 0.025f, "挺快的小费"),
+            (0.0001f, 0.01f, "一点点小费"),
+        };
 
         public static float BalanceFactor(float r)
         {
@@ -52,7 +70,7 @@ namespace CatMart
         }
 
         public static OrderResult Evaluate(CustomerOrder order, IList<GroceryItem> items, IList<Bag> bags,
-            System.Func<GroceryItem, bool> inCart, float patience01)
+            System.Func<GroceryItem, bool> inCart, float patience01, bool memoryOrder = false)
         {
             var r = new OrderResult { ItemsTotal = order.ItemsTotal };
             r.BasePay = r.ItemsTotal * Commission;
@@ -131,15 +149,34 @@ namespace CatMart
             }
 
             // 4) 耐心 & 漏装
-            r.PatienceFactor = patience01 >= 0.5f ? 1f : Mathf.Lerp(0.7f, 1f, patience01 / 0.5f);
+            r.PatienceFactor = patience01 > 0 ? 1f : ImpatientFactor;
             r.MissingFactor = Mathf.Pow(0.9f, r.Missing);
 
-            r.TipFactor = r.TippedNames.Count == 0 ? 1f : Mathf.Max(TippedFloor, Mathf.Pow(TippedPerItem, r.TippedNames.Count));
+            r.ToppleFactor = r.TippedNames.Count == 0 ? 1f : Mathf.Max(TippedFloor, Mathf.Pow(TippedPerItem, r.TippedNames.Count));
+            r.MemoryFactor = memoryOrder ? MemoryBonus : 1f;
 
-            r.Multiplier = r.ReqFactor * r.BalanceFactor * r.PatienceFactor * r.MissingFactor * r.TipFactor;
+            r.Multiplier = r.ReqFactor * r.BalanceFactor * r.PatienceFactor * r.MissingFactor * r.ToppleFactor * r.MemoryFactor;
             r.Pay = r.BasePay * r.Multiplier;
-            r.Net = r.Pay - r.DamagePenalty;
-            r.Stars = r.Multiplier >= 1.4f ? 3 : r.Multiplier >= 1.0f ? 2 : r.Multiplier >= 0.6f ? 1 : 0;
+
+            // 5) 小费：越快越多；弄坏了、漏装了、等太久了就没有
+            if (r.DamagedNames.Count > 0) r.TipNote = "弄坏了东西，没有小费";
+            else if (r.Missing > 0) r.TipNote = "漏装了东西，没有小费";
+            else if (patience01 <= 0) r.TipNote = "等太久了，没有小费";
+            else
+            {
+                for (int i = 0; i < TipTiers.Length; i++)
+                    if (patience01 >= TipTiers[i].Min)
+                    {
+                        r.TipTier = TipTiers.Length - i;
+                        r.Tip = r.ItemsTotal * TipTiers[i].Rate;
+                        r.TipNote = TipTiers[i].Name;
+                        break;
+                    }
+            }
+
+            r.Net = r.Pay + r.Tip - r.DamagePenalty;
+            float q = r.Multiplier / r.MemoryFactor; // 星级只看装得好不好
+            r.Stars = q >= 1.4f ? 3 : q >= 1.0f ? 2 : q >= 0.6f ? 1 : 0;
             if (r.DamagedNames.Count > 0) r.Stars = Mathf.Max(0, r.Stars - 1);
             return r;
         }

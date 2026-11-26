@@ -218,8 +218,28 @@ namespace CatMart
         /// 盒子图集 1024×512：正面 [0,0.375] 背面 [0.375,0.75] 侧面 [0.75,0.875] 顶面 [0.875,1]。
         /// 配合 BoxUv 使用。size = 盒子尺寸 (x 宽, y 高, z 深)。
         /// </summary>
+        /// <summary>森友会风：包装颜色调成粉彩、背景纯色、文字用深棕色而不是纯黑。</summary>
+        static LabelStyle Cz(LabelStyle s)
+        {
+            if (!ArtStyle.Cozy || s == null) return s;
+            return new LabelStyle
+            {
+                Brand = s.Brand, Title = s.Title, Sub = s.Sub, Badge = s.Badge,
+                Bg = ArtStyle.Pastel(s.Bg),
+                Bg2 = Color.Lerp(ArtStyle.Pastel(s.Bg), ArtStyle.Pastel(s.Bg2), 0.35f),
+                Accent = ArtStyle.Pastel(s.Accent),
+                Ink = s.Ink.grayscale < 0.35f ? new Color(0.30f, 0.20f, 0.15f) : s.Ink,
+                BrandInk = s.BrandInk,
+                Pattern = s.Pattern == LabelPattern.None ? LabelPattern.Paws : s.Pattern,
+                Icon = s.Icon == LabelIcon.None ? LabelIcon.Cat : s.Icon,
+                IconColor = ArtStyle.Pastel(s.IconColor),
+                Seed = s.Seed,
+            };
+        }
+
         public static Texture2D Box(Vector3 size, LabelStyle s)
         {
+            s = Cz(s);
             var regions = new List<Region>
             {
                 new Region { Px = new Rect(0, 0, 384, 512), W = size.x, H = size.y, Draw = c => Front(c, s), Clear = s.Bg },
@@ -246,6 +266,7 @@ namespace CatMart
         /// <summary>环绕标签（罐头/瓶子）：W=周长, H=标签高度。u=0.5 是正面。</summary>
         public static Texture2D Wrap(float circumference, float height, LabelStyle s)
         {
+            s = Cz(s);
             int w = 1024;
             int h = Mathf.Clamp(Mathf.NextPowerOfTwo((int)(w * height / circumference)), 128, 512);
             var regions = new List<Region>
@@ -258,8 +279,15 @@ namespace CatMart
                     float fw = Mathf.Min(circumference * 0.42f, height * 1.4f);
                     var sub = new Canvas(c.Root, fw, height);
                     FrontContent(c, s, 0, fw, height);
+                    if (ArtStyle.Cozy)
+                    {
+                        // 背面：两个大图标（不要写实的营养表和条码）
+                        float ir = Mathf.Min(circumference * 0.08f, height * 0.3f);
+                        DrawIcon(c, s.Icon, -circumference / 2 + circumference * 0.2f, 0, ir, s.IconColor, s.Accent, s.Bg);
+                        DrawIcon(c, LabelIcon.Paw, circumference / 2 - circumference * 0.2f, 0, ir * 0.8f, s.Accent, s.Accent, s.Bg);
+                        return;
+                    }
                     // 背面：营养表 + 条码，放在接缝两侧
-                    float bx = circumference * 0.5f - fw * 0.5f;
                     Nutrition(c, s, -circumference / 2 + circumference * 0.17f, 0, Mathf.Min(circumference * 0.22f, height * 0.9f), height * 0.8f);
                     Barcode(c, circumference / 2 - circumference * 0.14f, -height * 0.1f, Mathf.Min(circumference * 0.14f, height * 0.6f), height * 0.45f, s.Seed);
                 }},
@@ -270,6 +298,7 @@ namespace CatMart
         /// <summary>包装袋：1024×512，正面 [0,0.5]，背面 [0.5,1]（配合 Shapes.Pillow 的 UV）。</summary>
         public static Texture2D Pouch(Vector2 size, LabelStyle s)
         {
+            s = Cz(s);
             var regions = new List<Region>
             {
                 new Region { Px = new Rect(0, 0, 512, 512), W = size.x, H = size.y, Draw = c => Front(c, s), Clear = s.Bg },
@@ -281,6 +310,7 @@ namespace CatMart
         /// <summary>小贴纸/价签/腰封。</summary>
         public static Texture2D Sticker(Vector2 size, LabelStyle s, bool simple = false)
         {
+            s = Cz(s);
             int w = 512, h = Mathf.Clamp(Mathf.NextPowerOfTwo((int)(512 * size.y / size.x)), 64, 512);
             var regions = new List<Region>
             {
@@ -342,6 +372,7 @@ namespace CatMart
 
         static void Back(Canvas c, LabelStyle s)
         {
+            if (ArtStyle.Cozy) { CozyBack(c, s); return; }
             c.Gradient(Color.Lerp(s.Bg, Color.white, 0.25f), Color.Lerp(s.Bg2, Color.white, 0.25f));
             float W = c.W, H = c.H;
             c.Text(s.Brand + " · " + s.Title, 0, H * 0.4f, H * 0.06f, s.Ink, W * 0.9f, TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -349,6 +380,21 @@ namespace CatMart
             Barcode(c, W * 0.26f, -H * 0.3f, W * 0.3f, H * 0.18f, s.Seed);
             DrawIcon(c, LabelIcon.Cat, W * 0.26f, H * 0.12f, Mathf.Min(W, H) * 0.12f, s.Accent, s.Accent, Color.white);
             c.Text("CatMart 喵喵超市监制", W * 0.26f, -H * 0.05f, H * 0.035f, s.Ink, W * 0.4f);
+        }
+
+        /// <summary>森友会风背面：花纹 + 大图标 + 品牌横幅 + 一句卖萌的话。</summary>
+        static void CozyBack(Canvas c, LabelStyle s)
+        {
+            float W = c.W, H = c.H, u = Mathf.Min(W, H);
+            c.Gradient(s.Bg, s.Bg2);
+            DrawPattern(c, s, 1f);
+            c.Circle(0, H * 0.08f, u * 0.3f, Color.Lerp(s.Bg, Color.white, 0.55f));
+            DrawIcon(c, s.Icon, 0, H * 0.08f, u * 0.22f, s.IconColor, s.Accent, s.Bg);
+            float bh = H * 0.12f;
+            c.RoundRect(0, -H * 0.3f, W * 0.8f, bh, bh * 0.5f, s.Accent);
+            c.Text(s.Brand, 0, -H * 0.3f, bh * 0.6f, s.BrandInk, W * 0.75f, TextAnchor.MiddleCenter, FontStyle.Bold);
+            string[] lines = { "喵~ 好好吃", "猫猫推荐", "今天也要开心喵", "CatMart 精选" };
+            c.Text(lines[Mathf.Abs(s.Seed) % lines.Length], 0, H * 0.38f, H * 0.065f, s.Ink, W * 0.85f, TextAnchor.MiddleCenter, FontStyle.Bold);
         }
 
         static void Side(Canvas c, LabelStyle s)

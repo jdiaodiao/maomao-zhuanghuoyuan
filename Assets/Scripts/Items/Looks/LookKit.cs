@@ -289,6 +289,8 @@ namespace CatMart
         {
             var s = c.S(i);
             var tray = Shapes.OpenBox(new Vector3(s.x, s.y * 0.55f, s.z), 0.004f, 0.006f);
+            // 森友会风：不要写实的黑色托盘，换成浅色（深色托盘 → 淡蓝，其余 → 奶白）
+            if (ArtStyle.Cozy) trayColor = trayColor.HasValue && trayColor.Value.grayscale < 0.3f ? U.Hex("#BFE3EA") : U.Hex("#FFF8EE");
             Material trayMat = trayColor.HasValue ? Mats.Lit(trayColor.Value, 0.3f, 0, TexGen.Foam) : Foam;
             c.V(i).Add(tray, new Vector3(0, -s.y * 0.225f, 0), Quaternion.identity, trayMat);
             contents(c.V(i), new Vector3(s.x * 0.9f, s.y * 0.85f, s.z * 0.85f));
@@ -322,7 +324,8 @@ namespace CatMart
             var s = c.S(i);
             contents(c.V(i), s * 0.92f);
             var shell = Shapes.RoundedBox(s * 1.01f, Mathf.Min(s.x, Mathf.Min(s.y, s.z)) * 0.45f, 4, 3);
-            c.V(i).Add(shell, Mats.Cutout(netColor, TexGen.Net, 0.5f, new Vector2(3, 3)));
+            // 森友会风：网眼更大、网线更粗（像手绘的网兜）
+            c.V(i).Add(shell, ArtStyle.Cozy ? Mats.Cutout(netColor, TexGen.NetThick, 0.5f, new Vector2(1.6f, 1.6f)) : Mats.Cutout(netColor, TexGen.Net, 0.5f, new Vector2(3, 3)));
             // 顶部卡扣 + 纸签
             c.V(i).Add(Shapes.RoundedBox(new Vector3(0.012f, 0.012f, 0.03f), 0.003f, 2, 1), new Vector3(s.x * 0.5f, 0, 0), Quaternion.identity, Plastic(netColor));
             Sticker(c, i, new Vector3(s.x * 0.5f + 0.004f, 0, -0.0f), new Vector2(s.z * 0.6f, s.y * 0.55f), Quaternion.Euler(0, -90, 0), null, true);

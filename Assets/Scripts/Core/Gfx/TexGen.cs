@@ -93,6 +93,58 @@ namespace CatMart
             return t;
         }
 
+        /// <summary>
+        /// 森友会风：把写实的彩色贴图（肉、鱼、果皮…）变成“手绘色块”——
+        /// 先模糊掉细碎纹理，再把明暗压成几档，颜色稍微提亮、降饱和。
+        /// </summary>
+        public static Texture2D Cozify(Texture2D src)
+        {
+            if (src == null || !src.isReadable) return src;
+            return Get("cozy_" + src.name + "_" + src.GetInstanceIDSafe(), () =>
+            {
+                int w = src.width, h = src.height;
+                var px = src.GetPixels();
+                int r = Mathf.Max(1, Mathf.Min(w, h) / 100);   // 只抹掉最细的颗粒，西瓜条纹、菠萝格子要留着
+                for (int pass = 0; pass < 1; pass++)
+                {
+                    px = BoxBlur(px, w, h, r, true);
+                    px = BoxBlur(px, w, h, r, false);
+                }
+                for (int i = 0; i < px.Length; i++)
+                {
+                    Color.RGBToHSV(px[i], out float hh, out float s, out float v);
+                    float q = Mathf.Round(v * 4f) / 4f;
+                    v = Mathf.Lerp(v, q, 0.6f);
+                    var c = Color.HSVToRGB(hh, s * 0.88f, Mathf.Lerp(v, 1f, 0.08f));
+                    c.a = px[i].a;
+                    px[i] = c;
+                }
+                var tex = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapMode = src.wrapMode, filterMode = FilterMode.Trilinear, anisoLevel = 2 };
+                tex.SetPixels(px);
+                tex.Apply(true, false);
+                return tex;
+            });
+        }
+
+        static Color[] BoxBlur(Color[] src, int w, int h, int r, bool horizontal)
+        {
+            var dst = new Color[src.Length];
+            float inv = 1f / (2 * r + 1);
+            for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                Color sum = default;
+                for (int k = -r; k <= r; k++)
+                {
+                    int xx = horizontal ? ((x + k) % w + w) % w : x;
+                    int yy = horizontal ? y : ((y + k) % h + h) % h;
+                    sum += src[yy * w + xx];
+                }
+                dst[y * w + x] = sum * inv;
+            }
+            return dst;
+        }
+
         public static Texture2D Make(int w, int h, Func<float, float, Color> f, bool linear = false)
         {
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, true, linear) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
@@ -241,6 +293,14 @@ namespace CatMart
             });
             return t;
         });
+
+        /// <summary>森友会风网兜：网线更粗、圆头。</summary>
+        public static Texture2D NetThick => Get("netThick", () => Make(128, 128, (u, v) =>
+        {
+            float a = Frac(u * 6 + v * 6), b = Frac(u * 6 - v * 6);
+            float d = Mathf.Min(Mathf.Min(a, 1 - a), Mathf.Min(b, 1 - b));
+            return new Color(1, 1, 1, Mathf.Clamp01((0.15f - d) * 30f + 0.5f));
+        }));
 
         public static Texture2D Bread => Get("bread", () => Make(256, 256, (u, v) =>
         {
