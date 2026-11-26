@@ -238,6 +238,7 @@ namespace CatMart
             yield return Shot("8_cat");
 
             yield return LevelTest(g);
+            yield return TestLevelCheck(g);
             Log("自动测试完成");
             Application.Quit();
         }
@@ -285,6 +286,28 @@ namespace CatMart
             g.EndDayAndContinue();
             yield return null;
             Log($"下一关: 第{g.Day}关 (之前 {day0}) 钱包 {g.Money:0.00} 目标 {g.DayGoal:0.00}");
+        }
+
+        /// <summary>测试关：说明页 + 订单内容是否和 TestLevel 一致。</summary>
+        IEnumerator TestLevelCheck(GameManager g)
+        {
+            g.BackToTitle();
+            HUD.TestBrief = true;
+            yield return new WaitForSeconds(0.3f);
+            yield return Shot("13_test_brief");
+            HUD.TestBrief = false;
+            var missing = TestLevel.Orders.SelectMany(o => o.Items).Where(id => ItemCatalog.Get(id) == null).ToList();
+            g.StartTestLevel();
+            Log($"测试关: test={g.IsTest} {g.DayOrders.Count}单 目标 {g.DayGoal:0.00} 找不到的商品 [{string.Join(",", missing)}]");
+            for (int i = 0; i < g.DayOrders.Count; i++)
+                Log($"  单{i + 1} memory={g.DayOrders[i].Memory} 耐心{g.DayOrders[i].PatienceSeconds:0}s 袋子 {g.DayOrders[i].BagRequestText} 商品 {string.Join(",", g.DayOrders[i].Items.Select(d => d.Name))}");
+            g.Player.transform.position = new Vector3(-0.6f, 0, -0.6f);
+            SetView(g.Player, -40, 35);
+            yield return new WaitForSeconds(4f);
+            yield return Shot("14_test_order1");
+            int day = g.Day; float money = g.Money;
+            g.BackToTitle();
+            Log($"测试关不存档: 关卡 {day}->{g.Day} 钱包 {money:0.00}->{g.Money:0.00} phase={g.Phase}");
         }
 
         IEnumerator TipTest(GameManager g)

@@ -101,6 +101,25 @@ namespace CatMart
             return o;
         }
 
+        /// <summary>指定商品的订单（测试关用）。装不下就用 4 个大袋兜底。</summary>
+        public static CustomerOrder Custom(int ticket, IEnumerable<ItemDefinition> items, BagMaterial material, int seed, float patience = -1)
+        {
+            var rng = new System.Random(seed);
+            var o = new CustomerOrder
+            {
+                Ticket = ticket,
+                Seed = seed,
+                CustomerName = Names[rng.Next(Names.Length)],
+                Fur = Furs[rng.Next(Furs.Length)],
+                Material = material,
+            };
+            o.Items.AddRange(items.Where(d => d != null));
+            if (!ChooseBags(o)) { o.Bags.Clear(); o.Bags[BagSize.Large] = Mathf.Clamp(o.Items.Count(i => !i.Bulky), 1, 4); }
+            o.Items = o.Items.OrderBy(_ => rng.Next()).ToList();
+            o.PatienceSeconds = patience > 0 ? patience : 50f + o.Items.Count * 9f;
+            return o;
+        }
+
         /// <summary>选出满足体积/重量的最少袋子组合。</summary>
         static bool ChooseBags(CustomerOrder o)
         {

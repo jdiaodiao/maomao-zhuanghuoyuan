@@ -99,8 +99,43 @@ namespace CatMart
         }
 
         // ------------------------------------------------------------ 开场
+        public static bool TestBrief;
+
+        /// <summary>测试关说明：这次改了什么、每一单测什么。</summary>
+        void DrawTestBrief()
+        {
+            float w = S(980), h = S(760);
+            var r = new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
+            GUILayout.BeginArea(r, _panel);
+            GUILayout.Label("测试关", _title);
+            GUILayout.Label($"<color=#AAAAAA>{TestLevel.Version} · 不存档，不影响正式关卡和钱包</color>", _small);
+            GUILayout.Space(S(10));
+            var sb = new StringBuilder();
+            sb.AppendLine("<color=#F2C14E><b>这次改了什么 / 要看什么</b></color>");
+            foreach (var line in TestLevel.Checklist) sb.AppendLine("□ " + line);
+            sb.AppendLine();
+            sb.AppendLine("<color=#F2C14E><b>四位顾客</b></color>");
+            for (int i = 0; i < TestLevel.Orders.Length; i++)
+            {
+                var o = TestLevel.Orders[i];
+                var names = string.Join("、", o.Items.Select(id => ItemCatalog.Get(id)?.Name ?? $"<color=#FF6B5B>{id}?</color>"));
+                sb.AppendLine($"{i + 1}. {(o.Memory ? "<color=#C7A6FF>[记忆单]</color> " : "")}{o.Note}");
+                sb.AppendLine($"   <color=#AAAAAA>{names}</color>");
+            }
+            GUILayout.Label(sb.ToString(), _small);
+            GUILayout.FlexibleSpace();
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("返回", _button, GUILayout.Width(S(160)), GUILayout.Height(S(56)))) TestBrief = false;
+            GUILayout.Space(S(12));
+            if (GUILayout.Button("开始测试 ▶", _button, GUILayout.Width(S(260)), GUILayout.Height(S(56)))) { TestBrief = false; G.StartTestLevel(); }
+            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
+        }
+
         void DrawIntro()
         {
+            if (TestBrief) { DrawTestBrief(); return; }
             float w = S(980), h = S(760);
             var r = new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
             GUILayout.BeginArea(r, _panel);
@@ -121,13 +156,15 @@ namespace CatMart
             GUILayout.Space(S(10));
             GUILayout.Label(ControlsText(), _small);
             GUILayout.FlexibleSpace();
-            GUILayout.BeginHorizontal();
             GUILayout.Label($"第 {G.Day} 关   钱包 {U.Money(G.Money)}", _label);
-            GUILayout.FlexibleSpace();
+            GUILayout.Space(S(6));
+            GUILayout.BeginHorizontal();
             if (GUILayout.Button($"画风：{ArtStyle.Name}", _button, GUILayout.Width(S(220)), GUILayout.Height(S(56)))) ArtStyle.Toggle();
             GUILayout.Space(S(12));
             if (G.Day > 1 || G.Money != 0)
                 if (GUILayout.Button("重置存档", _button, GUILayout.Width(S(160)), GUILayout.Height(S(56)))) G.ResetProgress();
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("测试关", _button, GUILayout.Width(S(160)), GUILayout.Height(S(56)))) TestBrief = true;
             GUILayout.Space(S(12));
             if (GUILayout.Button("开始营业 ▶", _button, GUILayout.Width(S(260)), GUILayout.Height(S(56)))) G.StartDay();
             GUILayout.EndHorizontal();
@@ -145,7 +182,7 @@ namespace CatMart
             // 左上：状态
             var r = new Rect(S(16), S(16), S(560), S(TopH));
             GUILayout.BeginArea(r, _panel);
-            GUILayout.Label($"<b>第 {G.Day} 关</b> · 顾客 {Mathf.Min(G.CustomerIndex + (G.Phase == GameManager.State.Serving ? 1 : 0), GameManager.CustomersPerDay)}/{GameManager.CustomersPerDay}" +
+            GUILayout.Label((G.IsTest ? "<b><color=#7FD6FF>测试关</color></b>" : $"<b>第 {G.Day} 关</b>") + $" · 顾客 {Mathf.Min(G.CustomerIndex + (G.Phase == GameManager.State.Serving ? 1 : 0), GameManager.CustomersPerDay)}/{GameManager.CustomersPerDay}" +
                             $"   <color=#AAAAAA>钱包 {U.Money(G.Money)}</color>", _label);
             string goalCol = G.DayPassed ? "#7CFC9A" : "#FFFFFF";
             GUILayout.Label($"今日收入 <color={goalCol}><b>{U.Money(G.DayEarned)}</b></color> / 目标 <b>{U.Money(G.DayGoal)}</b>" +
@@ -171,8 +208,10 @@ namespace CatMart
 
             // 左上：顾客要求 + 耐心（不挡住正前方的顾客）
             float w = S(560);
-            var rr = new Rect(S(16), S(TopH + 24), w, S(o.Memory ? 168 : 140));
+            string testNote = G.TestNote;
+            var rr = new Rect(S(16), S(TopH + 24), w, S(140 + (o.Memory ? 28 : 0) + (testNote != null ? 28 : 0)));
             GUILayout.BeginArea(rr, _panel);
+            if (testNote != null) GUILayout.Label($"<color=#7FD6FF><b>测试</b></color> {testNote}", _small);
             if (o.Memory) GUILayout.Label($"<color=#C7A6FF><b>记忆单</b></color> <color=#AAAAAA>没有光边和属性说明 · 工钱 ×{Settlement.MemoryBonus:0.0}</color>", _small);
             GUILayout.Label($"<b>{o.CustomerName}</b> 的要求：<color=#F2C14E><b>{o.BagRequestText}</b></color>" +
                             (o.Items.Any(i => i.Bulky) ? "  <color=#6FC3FF>（大件放推车）</color>" : ""), _label);
@@ -394,8 +433,9 @@ namespace CatMart
             sb.AppendLine();
             string col = G.DayPassed ? "#7CFC9A" : "#FF6B5B";
             sb.AppendLine($"今日收入 <color={col}><b>{U.Money(total)}</b></color> / 目标 <b>{U.Money(G.DayGoal)}</b>   星星 {stars}/{G.DayResults.Count * 3}");
-            sb.AppendLine(G.DayPassed
-                ? $"收入存进钱包 → <color=#7CFC9A><b>{U.Money(G.Money + G.DayEarned)}</b></color>"
+            sb.AppendLine(G.IsTest ? $"<color=#7FD6FF>测试关不存档</color>（{(G.DayPassed ? "达标了" : $"还差 {U.Money(G.DayGoal - G.DayEarned)}")}）"
+                : G.DayPassed
+                ?$"收入存进钱包 → <color=#7CFC9A><b>{U.Money(G.Money + G.DayEarned)}</b></color>"
                 : $"还差 <color=#FF6B5B><b>{U.Money(G.DayGoal - G.DayEarned)}</b></color>，这一关要重来（今天的收入不计）");
             string rank = stars >= G.DayResults.Count * 3 - 1 ? "金牌装袋猫！" : stars >= G.DayResults.Count * 2 ? "合格的装袋猫" : "店长在看着你喵…";
             sb.AppendLine($"\n评价：<color=#F2C14E><b>{rank}</b></color>");
@@ -403,7 +443,13 @@ namespace CatMart
             GUILayout.FlexibleSpace();
             GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button(G.DayPassed ? "下一关 ▶" : "重来这一关 ↻", _button, GUILayout.Width(S(280)), GUILayout.Height(S(58)))) G.EndDayAndContinue();
+            if (G.IsTest)
+            {
+                if (GUILayout.Button("回到标题", _button, GUILayout.Width(S(200)), GUILayout.Height(S(58)))) G.BackToTitle();
+                GUILayout.Space(S(12));
+                if (GUILayout.Button("再测一次 ↻", _button, GUILayout.Width(S(240)), GUILayout.Height(S(58)))) G.EndDayAndContinue();
+            }
+            else if (GUILayout.Button(G.DayPassed ? "下一关 ▶" : "重来这一关 ↻", _button, GUILayout.Width(S(280)), GUILayout.Height(S(58)))) G.EndDayAndContinue();
             GUILayout.EndHorizontal();
             GUILayout.EndArea();
         }

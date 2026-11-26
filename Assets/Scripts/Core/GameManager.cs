@@ -77,11 +77,57 @@ namespace CatMart
         // ------------------------------------------------------------ 流程
         public void StartDay()
         {
+            IsTest = false;
             CustomerIndex = 0;
             DayResults.Clear();
             DayEarned = 0;
             GenerateDayOrders();
             NextCustomer();
+        }
+
+        /// <summary>测试关：订单来自 TestLevel（这次改动要测的东西），不存档、不影响钱包和关卡进度。</summary>
+        public bool IsTest { get; private set; }
+
+        public void StartTestLevel()
+        {
+            IsTest = true;
+            CustomerIndex = 0;
+            DayResults.Clear();
+            DayEarned = 0;
+            DayOrders.Clear();
+            int seed = Random.Range(0, 100000);
+            foreach (var spec in TestLevel.Orders)
+            {
+                var o = OrderGenerator.Custom(_ticket++, spec.Items.Select(ItemCatalog.Get), spec.Material, seed + DayOrders.Count * 131, spec.Patience);
+                o.Memory = spec.Memory;
+                DayOrders.Add(o);
+            }
+            ComputeGoal(1);
+            NextCustomer();
+        }
+
+        /// <summary>这一单在测试关里要测什么（不是测试关就是 null）。</summary>
+        public string TestNote => IsTest && CustomerIndex < TestLevel.Orders.Length && Phase == State.Serving ? TestLevel.Orders[CustomerIndex].Note : null;
+
+        /// <summary>回到开场界面（测试关结束用）。</summary>
+        public void BackToTitle()
+        {
+            ClearTable();
+            IsTest = false;
+            Order = null;
+            DayOrders.Clear();
+            DayResults.Clear();
+            DayEarned = 0;
+            Phase = State.Intro;
+            Player.InputEnabled = false;
+            PlayerController.LockCursor(false);
+            Store.Customer.gameObject.SetActive(false);
+        }
+
+        void ComputeGoal(int day)
+        {
+            float basePay = DayOrders.Sum(o => o.ItemsTotal * Settlement.Commission * (o.Memory ? Settlement.MemoryBonus : 1f));
+            DayGoal = Mathf.Max(1f, Mathf.Round(basePay * GoalRatio(day) * 2f) / 2f); // 取整到 $0.5
         }
 
         /// <summary>一次生成今天的 4 单；最后一单只从前几单出现过的商品里挑。</summary>
@@ -98,14 +144,13 @@ namespace CatMart
                 foreach (var d in o.Items) seen.Add(d);
                 DayOrders.Add(o);
             }
-            float basePay = DayOrders.Sum(o => o.ItemsTotal * Settlement.Commission * (o.Memory ? Settlement.MemoryBonus : 1f));
-            DayGoal = Mathf.Max(1f, Mathf.Round(basePay * GoalRatio(Day) * 2f) / 2f); // 取整到 $0.5
+            ComputeGoal(Day);
         }
 
         public void NextCustomer()
         {
             ClearTable();
-            if (CustomerIndex >= CustomersPerDay)
+            if (CustomerIndex >= (DayOrders.Count > 0 ? DayOrders.Count : CustomersPerDay))
             {
                 Phase = State.DaySummary;
                 Player.InputEnabled = false;
@@ -114,7 +159,7 @@ namespace CatMart
                 return;
             }
 
-            if (DayOrders.Count != CustomersPerDay) GenerateDayOrders();
+            if (DayOrders.Count == 0) GenerateDayOrders();
             Order = DayOrders[CustomerIndex];
             int seed = Order.Seed;
             TraitHints = !Order.Memory;
@@ -161,6 +206,7 @@ namespace CatMart
         /// <summary>今日结算界面的按钮：过关 → 收入存进钱包，进入下一天；没过 → 重来这一天（这天的收入作废）。</summary>
         public void EndDayAndContinue()
         {
+            if (IsTest) { StartTestLevel(); return; } // 测试关：再测一次，不存档
             if (DayPassed)
             {
                 Money += DayEarned;
