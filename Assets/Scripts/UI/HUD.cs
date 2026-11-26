@@ -91,7 +91,7 @@ namespace CatMart
             switch (G.Phase)
             {
                 case GameManager.State.Intro: DrawIntro(); break;
-                case GameManager.State.Serving: DrawServing(); break;
+                case GameManager.State.Serving: DrawServing(); if (G.Paused) DrawPause(); break;
                 case GameManager.State.Settlement: DrawServingTop(); DrawSettlement(); break;
                 case GameManager.State.DaySummary: DrawDaySummary(); break;
             }
@@ -171,10 +171,34 @@ namespace CatMart
             GUILayout.EndArea();
         }
 
+        // ------------------------------------------------------------ 暂停
+        void DrawPause()
+        {
+            GUI.color = new Color(0, 0, 0, 0.45f);
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), _white);
+            GUI.color = Color.white;
+            float w = S(520), h = S(440);
+            var r = new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
+            GUILayout.BeginArea(r, _panel);
+            GUILayout.Label("暂停", new GUIStyle(_title) { alignment = TextAnchor.MiddleCenter });
+            GUILayout.Label(G.IsTest ? "测试关（不存档）" : $"第 {G.Day} 关 · 顾客 {G.CustomerIndex + 1}/{GameManager.CustomersPerDay} · 今日 {U.Money(G.DayEarned)} / {U.Money(G.DayGoal)}",
+                new GUIStyle(_small) { alignment = TextAnchor.MiddleCenter });
+            GUILayout.Space(S(18));
+            var opt = new[] { GUILayout.Height(S(58)), GUILayout.ExpandWidth(true) };
+            if (GUILayout.Button("继续 (Esc)", _button, opt)) G.SetPaused(false);
+            GUILayout.Space(S(12));
+            if (GUILayout.Button(G.IsTest ? "重来测试关 ↻" : "重来这一关 ↻", _button, opt)) G.RestartLevel();
+            GUILayout.Space(S(12));
+            if (GUILayout.Button("回到标题", _button, opt)) G.BackToTitle();
+            GUILayout.FlexibleSpace();
+            GUILayout.Label("<color=#AAAAAA>重来或回到标题：今天已经赚的钱不算（钱包里的不受影响）</color>", new GUIStyle(_small) { alignment = TextAnchor.MiddleCenter });
+            GUILayout.EndArea();
+        }
+
         static string ControlsText() =>
             "鼠标 看   WASD 移动   左键按住 抓起（松开=轻放，Shift+松开=扔下）   <color=#F2C14E>右键按住 按压</color>（圆圈变红就停）\n" +
             "滚轮 抬高/放低   Q/E 水平转   R/F 前后翻   C 侧放   Z 回正   X 收回空袋\n" +
-            "<color=#F2C14E><b>V 俯视装袋</b></color>   Tab 小票   B 重心标记   Enter 完成订单   H 隐藏帮助   M 静音  -/= 音量   Esc 释放鼠标";
+            "<color=#F2C14E><b>V 俯视装袋</b></color>   Tab 小票   B 重心标记   Enter 完成订单   H 隐藏帮助   M 静音  -/= 音量   <color=#F2C14E>Esc/P 暂停</color>";
 
         // ------------------------------------------------------------ 营业中
         void DrawServingTop()
@@ -263,7 +287,7 @@ namespace CatMart
                 GUI.Box(tr, GUIContent.none, _panel);
                 GUI.Label(tr, P.Held != null
                     ? "<b>俯视装袋</b> · 移动鼠标摆放 · 松开=轻放到底 · Shift+松开=扔下 · 滚轮 抬高/放低 · Q/E R/F C Z 旋转"
-                    : "<b>俯视装袋</b> · 左键拿 · 右键按压 · WASD 平移 · 滚轮 缩放 · 1-4 袋位 · 5 购物车 · V/Esc 返回", _center);
+                    : "<b>俯视装袋</b> · 左键拿 · 右键按压 · WASD 平移 · 滚轮 缩放 · 1-4 袋位 · 5 购物车 · V/Esc 返回 · P 暂停", _center);
             }
             else if (P != null && P.CursorLocked)
             {
@@ -273,7 +297,7 @@ namespace CatMart
                 GUI.DrawTexture(new Rect(Screen.width / 2f - cs / 2, Screen.height / 2f - cs / 2, cs, cs), _white);
                 GUI.color = Color.white;
             }
-            else
+            else if (!G.Paused)
             {
                 GUI.Label(new Rect(0, Screen.height / 2f + S(40), Screen.width, S(40)), "点击画面继续操作", _center);
             }

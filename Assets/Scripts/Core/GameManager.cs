@@ -21,6 +21,31 @@ namespace CatMart
         public static float GoalRatio(int day) => Mathf.Min(1.35f, 0.9f + 0.1f * (day - 1));
         const string MoneyKey = "CatMart.Money";
         const string DayKey = "CatMart.Day";
+        const string SaveVerKey = "CatMart.SaveVersion";
+        /// <summary>存档格式版本：2 = 关卡模式。</summary>
+        const int SaveVersion = 2;
+
+        // ------------------------------------------------------------ 暂停
+        public bool Paused { get; private set; }
+        int _pauseFrame = -1;
+
+        public void SetPaused(bool on)
+        {
+            if (on && Phase != State.Serving) return;
+            if (on == Paused) return;
+            Paused = on;
+            _pauseFrame = Time.frameCount;
+            Time.timeScale = on ? 0f : 1f;
+            if (on) PlayerController.LockCursor(false);
+            else if (Phase == State.Serving && !Player.TopView) PlayerController.LockCursor(true);
+        }
+
+        /// <summary>重来这一关（测试关就重来测试关）。今天已经赚的不算。</summary>
+        public void RestartLevel()
+        {
+            SetPaused(false);
+            if (IsTest) StartTestLevel(); else StartDay();
+        }
 
         public StoreRefs Store;
         public PlayerController Player;
@@ -65,6 +90,14 @@ namespace CatMart
             I = this;
             Store = store;
             Player = player;
+            // 旧存档（无尽模式时代的天数/钱）不适用于关卡模式 → 自动从第 1 关开始
+            if (PlayerPrefs.GetInt(SaveVerKey, 0) < SaveVersion)
+            {
+                PlayerPrefs.DeleteKey(MoneyKey);
+                PlayerPrefs.DeleteKey(DayKey);
+                PlayerPrefs.SetInt(SaveVerKey, SaveVersion);
+                PlayerPrefs.Save();
+            }
             Money = PlayerPrefs.GetFloat(MoneyKey, 0f);
             Day = PlayerPrefs.GetInt(DayKey, 1);
             _ticket = Random.Range(1000, 9000);
@@ -112,6 +145,7 @@ namespace CatMart
         /// <summary>回到开场界面（测试关结束用）。</summary>
         public void BackToTitle()
         {
+            SetPaused(false);
             ClearTable();
             IsTest = false;
             Order = null;
@@ -285,6 +319,12 @@ namespace CatMart
             if (_toastTime > 0) _toastTime -= Time.deltaTime;
             if (Input.GetKeyDown(KeyCode.Tab)) ShowReceipt = !ShowReceipt;
             if (Input.GetKeyDown(KeyCode.H)) ShowHelp = !ShowHelp;
+            if (Input.GetKeyDown(KeyCode.P) && Phase == State.Serving && Time.frameCount != _pauseFrame) SetPaused(!Paused);
+            if (Paused)
+            {
+                if (Input.GetKeyDown(KeyCode.Escape) && Time.frameCount != _pauseFrame) SetPaused(false);
+                return;
+            }
 
             if (Phase != State.Serving) return;
 

@@ -65,6 +65,8 @@ namespace CatMart
 
         void Update()
         {
+            // 暂停中：什么都不处理（手里的东西保持拿着）
+            if (GameManager.I != null && GameManager.I.Paused) { ClearLook(); return; }
             if (!InputEnabled)
             {
                 if (Held != null) Release();
@@ -137,7 +139,7 @@ namespace CatMart
         /// <summary>第一人称输入。返回 false 表示本帧不处理交互（鼠标未锁定）。</summary>
         bool UpdateFirstPerson()
         {
-            if (Input.GetKeyDown(KeyCode.Escape)) LockCursor(false);
+            if (Input.GetKeyDown(KeyCode.Escape)) { GameManager.I.SetPaused(true); return false; }
             if (!CursorLocked)
             {
                 if (Input.GetMouseButtonDown(0) && GUIUtility.hotControl == 0) LockCursor(true);

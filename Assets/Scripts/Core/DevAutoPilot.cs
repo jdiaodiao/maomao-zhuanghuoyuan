@@ -305,6 +305,15 @@ namespace CatMart
             SetView(g.Player, -40, 35);
             yield return new WaitForSeconds(4f);
             yield return Shot("14_test_order1");
+            // 暂停：时间停住、耐心不掉；重来回到第 1 位顾客
+            g.SetPaused(true);
+            float p0 = g.Patience;
+            yield return new WaitForSecondsRealtime(0.6f);
+            Log($"暂停: paused={g.Paused} timeScale={Time.timeScale} 耐心 {p0:0.0}->{g.Patience:0.0} (期望不变)");
+            yield return Shot("15_pause");
+            g.RestartLevel();
+            yield return null;
+            Log($"暂停后重来: paused={g.Paused} timeScale={Time.timeScale} test={g.IsTest} 顾客 {g.CustomerIndex + 1} phase={g.Phase}");
             int day = g.Day; float money = g.Money;
             g.BackToTitle();
             Log($"测试关不存档: 关卡 {day}->{g.Day} 钱包 {money:0.00}->{g.Money:0.00} phase={g.Phase}");
