@@ -95,7 +95,7 @@ namespace CatMart
             v.Add(Shapes.Quad(w * 0.7f, h * 0.45f), new Vector3(0, h * 0.45f, -d / 2 - 0.0035f), Quaternion.identity, logo);
             v.Add(Shapes.Quad(w * 0.7f, h * 0.45f), new Vector3(0, h * 0.45f, d / 2 + 0.0035f), Quaternion.Euler(0, 180, 0), logo);
             // 纸绳提手（中/大号）
-            if (spec.Size != BagSize.Small)
+            // 纸绳提手
             {
                 for (int side = -1; side <= 1; side += 2)
                 {
@@ -153,8 +153,8 @@ namespace CatMart
             root.transform.SetParent(parent, false);
             root.transform.localPosition = localPos;
             bool paper = spec.Material == BagMaterial.Paper;
-            float scale = spec.Size == BagSize.Small ? 0.7f : spec.Size == BagSize.Medium ? 0.85f : 1f;
-            Vector3 size = new Vector3(0.12f * scale, 0.05f, 0.2f * scale);
+            float scale = spec.Size == BagSize.Medium ? 0.85f : 1f;
+            Vector3 size = spec.Size == BagSize.Square ? new Vector3(0.14f, 0.05f, 0.14f) : new Vector3(0.12f * scale, 0.05f, 0.2f * scale);
             var v = new VisualSet();
             var mat = paper ? KraftMat : Mats.Lit(PlasticWhite, 0.55f, 0, null, TexGen.PlasticWrinkleN, 0.5f);
             for (int i = 0; i < 10; i++)

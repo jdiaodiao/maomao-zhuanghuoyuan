@@ -259,12 +259,13 @@ namespace CatMart
             v.Add(Shapes.Tube(new[] { new Vector3(1.0f, top, Layout.LaneZ + 0.3f), new Vector3(1.0f, top + 0.12f, Layout.LaneZ + 0.3f) }, new[] { 0.006f, 0.006f }, 8), Chrome);
             v.Add(Shapes.Tube(new[] { new Vector3(1.24f, top, Layout.LaneZ + 0.3f), new Vector3(1.24f, top + 0.12f, Layout.LaneZ + 0.3f) }, new[] { 0.006f, 0.006f }, 8), Chrome);
             Text3D.Create(root, "袋子 · 点一下取用", new Vector3(1.12f, top + 0.12f, Layout.LaneZ + 0.292f), 0.035f, Color.white, TextAnchor.MiddleCenter, Quaternion.Euler(-8, 0, 0));
-            BagSize[] sizes = { BagSize.Small, BagSize.Medium, BagSize.Large };
-            for (int i = 0; i < 3; i++)
-            {
-                BagFactory.CreateRackStack(root, BagSpec.Get(BagMaterial.Paper, sizes[i]), new Vector3(0.96f + i * 0.155f, top, 0.2f));
-                BagFactory.CreateRackStack(root, BagSpec.Get(BagMaterial.Plastic, sizes[i]), new Vector3(0.96f + i * 0.155f, top, -0.01f));
-            }
+            // 纸袋：中、大；塑料袋：中、大、方底
+            var paperSizes = BagSpec.SizesFor(BagMaterial.Paper);
+            var plasticSizes = BagSpec.SizesFor(BagMaterial.Plastic);
+            for (int i = 0; i < paperSizes.Length; i++)
+                BagFactory.CreateRackStack(root, BagSpec.Get(BagMaterial.Paper, paperSizes[i]), new Vector3(0.96f + i * 0.155f, top, 0.2f));
+            for (int i = 0; i < plasticSizes.Length; i++)
+                BagFactory.CreateRackStack(root, BagSpec.Get(BagMaterial.Plastic, plasticSizes[i]), new Vector3(0.96f + i * 0.155f, top, -0.01f));
 
             // 猫铃
             var bell = new GameObject("猫铃").transform;

@@ -44,6 +44,9 @@ namespace CatMart
     public static class Settlement
     {
         public const float Commission = 0.10f;
+        /// <summary>弄坏商品的赔偿 = 商品价格 × 这个比例。</summary>
+        public const float DamageRate = 0.5f;
+        public static float DamageCost(ItemDefinition d) => d.Price * DamageRate;
         /// <summary>每件质心高出袋口的商品，该袋系数 ×0.8，最低 ×0.4。</summary>
         public const float UnstablePerItem = 0.8f, UnstableFloor = 0.4f;
         /// <summary>每件翻倒的"不能倒"商品，总倍率 ×0.75，最低 ×0.4。</summary>
@@ -81,7 +84,7 @@ namespace CatMart
             foreach (var it in items)
             {
                 if (it == null) continue;
-                if (it.IsDamaged) { r.DamagePenalty += it.Def.Price; r.DamagedNames.Add(it.Def.Name); }
+                if (it.IsDamaged) { r.DamagePenalty += DamageCost(it.Def); r.DamagedNames.Add(it.Def.Name); }
                 if (it.IsDestroyed) continue;
                 if (it.Tipped && !it.IsDamaged) r.TippedNames.Add(it.Def.Name);
 
@@ -135,7 +138,7 @@ namespace CatMart
             else
             {
                 bool match = true;
-                foreach (BagSize s in new[] { BagSize.Small, BagSize.Medium, BagSize.Large })
+                foreach (BagSize s in BagSpec.AllSizes)
                 {
                     int want = order.Bags.TryGetValue(s, out int w) ? w : 0;
                     int got = used.Count(u => u.Size == s);

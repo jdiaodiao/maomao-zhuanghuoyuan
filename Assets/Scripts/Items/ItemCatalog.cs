@@ -191,7 +191,7 @@ namespace CatMart
             Add("onions", "黄洋葱 (3磅)", Produce, 2.97f, 1.36f, Bruise)
                 .Body(24, 10, 16, "#D7A86E", crush: 500, n: "网袋").Label("#E53935", 0.3f);
             Add("pineapple", "菠萝", Produce, 2.48f, 1.6f, Bruise).Liquid("#FFEE58")
-                .BallBody(13, 19, 13, "#C68A2B", crush: 400, sharp: 0.5f, n: "果身")
+                .BallBody(13, 19, 13, "#C68A2B", crush: 400, sharp: 0.35f, n: "果身")
                 .Cone("叶冠", 0, 25, 0, 10, 12, 10, "#558B2F", 300, sharp: 0.85f).Com(0, -2, 0);
             Add("lemons", "柠檬", Produce, 0.58f, 0.12f, Bruise).Freq(1.2f)
                 .Ball("柠檬", 0, 3, 0, 7, 6, 6, "#FDD835", 80);
@@ -211,7 +211,7 @@ namespace CatMart
             Add("frozen_shrimp", "冷冻大虾", Frozen, 8.97f, 0.9f, Crumple)
                 .Body(25, 6, 18, "#4FC3F7", crush: 400, sharp: 0.6f, n: "冻虾袋").Logo("#FF7043", 0.5f, 0.5f, 0.5f).Freq(0.7f);
             Add("frozen_peas", "冷冻豌豆", Frozen, 1.12f, 0.45f, Crumple)
-                .Body(18, 5, 24, "#2E7D32", crush: 300, sharp: 0.3f, n: "冻豌豆袋").Label("#A5D6A7", 0.3f);
+                .Body(18, 5, 24, "#2E7D32", crush: 300, sharp: 0.1f, n: "冻豌豆袋").Label("#A5D6A7", 0.3f);
             Add("fish_fillet", "三文鱼片", Meat, 6.48f, 0.45f, Leak).Liquid("#FFAB91")
                 .Body(20, 3, 14, "#FF8A65", crush: 60, n: "鱼片盒").Gloss(0.7f);
             Add("frozen_dinner", "冷冻便当", Frozen, 2.98f, 0.35f, Crumple)
@@ -258,18 +258,18 @@ namespace CatMart
             Add("coffee", "咖啡豆", Drinks, 8.98f, 0.9f, Crumple)
                 .Body(12, 24, 8, "#4E342E", crush: 200, n: "豆袋").Logo("#FFCC80", 0.6f, 0.3f, 0.6f);
             Add("energy_drink", "能量饮料", Drinks, 2.48f, 0.5f, Dent).Liquid("#C6FF00")
-                .CylBody(6.6f, 16, "#212121", crush: 300, sharp: 0.3f, n: "罐身").Gloss(0.8f).Label("#76FF03", 0.5f);
+                .CylBody(6.6f, 16, "#212121", crush: 300, sharp: 0.15f, n: "罐身").Gloss(0.8f).Label("#76FF03", 0.5f);
             Add("milk_tea", "瓶装奶茶", Drinks, 2.98f, 0.55f, Leak).Liquid("#D7B899")
                 .CylBody(7, 18, "#D7B899", crush: 200, n: "瓶身").Gloss(0.8f).Label("#5D4037", 0.4f)
                 .Cap(3.5f, 2, "#FFFFFF", 150);
 
             // ============ 粮油干货 ============
             Add("canned_soup", "番茄浓汤罐头", Pantry, 1.24f, 0.35f, Dent)
-                .CylBody(7, 10, "#B0BEC5", crush: 600, sharp: 0.4f, n: "罐身").Gloss(0.8f).Label("#D32F2F", 0.65f).Freq(1.3f);
+                .CylBody(7, 10, "#B0BEC5", crush: 600, sharp: 0.15f, n: "罐身").Gloss(0.8f).Label("#D32F2F", 0.65f).Freq(1.3f);
             Add("canned_tuna", "金枪鱼罐头", Pantry, 1.12f, 0.17f, Dent)
-                .CylBody(8.5f, 4, "#B0BEC5", crush: 700, sharp: 0.45f, n: "罐身").Gloss(0.8f).Label("#0277BD", 0.6f);
+                .CylBody(8.5f, 4, "#B0BEC5", crush: 700, sharp: 0.15f, n: "罐身").Gloss(0.8f).Label("#0277BD", 0.6f);
             Add("canned_beans", "茄汁黄豆罐头", Pantry, 0.98f, 0.45f, Dent)
-                .CylBody(7.5f, 11, "#B0BEC5", crush: 600, sharp: 0.4f, n: "罐身").Gloss(0.8f).Label("#FF7043", 0.65f);
+                .CylBody(7.5f, 11, "#B0BEC5", crush: 600, sharp: 0.15f, n: "罐身").Gloss(0.8f).Label("#FF7043", 0.65f);
             Add("pasta", "意大利面", Pantry, 1.28f, 0.45f, Crumple)
                 .Body(27, 7, 4, "#1976D2", crush: 40, sharp: 0.2f, n: "面盒").Logo("#FFFFFF", 0.4f, 0.5f, 0.5f);
             Add("rice", "长粒米 (5磅)", Pantry, 3.48f, 2.27f, Crumple)
@@ -318,7 +318,7 @@ namespace CatMart
                 .Body(14, 4, 10, "#FFEB3B", crush: 0, n: "海绵")
                 .Deco(Shape.Box, 0, 4.2f, 0, 14, 0.8f, 10, "#2E7D32");
             Add("foil", "铝箔纸", Household, 4.47f, 0.5f, Dent)
-                .Body(32, 5, 5, "#E0E0E0", crush: 100, sharp: 0.35f, n: "长盒").Label("#1565C0", 0.4f);
+                .Body(32, 5, 5, "#E0E0E0", crush: 100, sharp: 0.2f, n: "长盒").Label("#1565C0", 0.4f);
             Add("flower_vase", "插花 (玻璃花瓶)", Household, 12.98f, 1.25f, Shatter).Liquid("#D6ECFF")
                 .CylBody(10, 18, "#CFE8F0", crush: 500, impact: 2.6f, n: "花瓶").Gloss(0.9f)
                 .Ball("花束", 0, 25, 0, 17, 14, 17, "#F48FB1", 12).Style(Squish).Com(0, -4, 0).Upright().Freq(0.5f);
@@ -329,7 +329,7 @@ namespace CatMart
 
             // ============ 宠物 (猫猫区!) ============
             Add("cat_can", "金枪鱼猫罐头", Pet, 0.98f, 0.16f, Dent)
-                .CylBody(8.5f, 4, "#B0BEC5", crush: 700, sharp: 0.4f, n: "罐身").Gloss(0.8f).Label("#7E57C2", 0.6f).Freq(1.6f);
+                .CylBody(8.5f, 4, "#B0BEC5", crush: 700, sharp: 0.15f, n: "罐身").Gloss(0.8f).Label("#7E57C2", 0.6f).Freq(1.6f);
             Add("cat_litter", "猫砂 (20磅)", Pet, 12.98f, 9.1f, Dent)
                 .Body(30, 30, 20, "#455A64", crush: 4000, n: "猫砂桶").Logo("#FFEB3B", 0.6f, 0.3f, 0.6f)
                 .Deco(Shape.Box, 0, 31, 0, 10, 2, 4, "#263238").Bulky().Freq(0.7f);

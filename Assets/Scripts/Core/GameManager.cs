@@ -136,6 +136,7 @@ namespace CatMart
                 DayOrders.Add(o);
             }
             ComputeGoal(1);
+            DayGoal = Mathf.Max(1f, Mathf.Round(DayGoal * TestLevel.GoalScale * 2f) / 2f); // 测试关目标更低
             NextCustomer();
         }
 
@@ -287,7 +288,7 @@ namespace CatMart
         {
             if (Phase != State.Serving) return;
             int slot = System.Array.IndexOf(Slots, null);
-            if (slot < 0) { ShowToast("打包台放不下更多袋子了（看着空袋子按 X 收回）"); return; }
+            if (slot < 0) { ShowToast("打包台放不下更多袋子了（点一下空袋子就能放回去）"); return; }
             var bag = BagFactory.Create(spec, Store.BagSlots[slot], Quaternion.identity);
             bag.Slot = slot;
             Slots[slot] = bag;
@@ -297,7 +298,7 @@ namespace CatMart
         public void RemoveBag(Bag bag)
         {
             if (bag == null || Phase != State.Serving) return;
-            if (bag.Contents().Count > 0) { ShowToast("袋子里还有东西，不能收回"); return; }
+            if (bag.Contents().Count > 0) { ShowToast("袋子里还有东西，先拿出来才能放回去"); return; }
             Slots[bag.Slot] = null;
             Destroy(bag.gameObject);
             Sfx.Play("bag", 0.6f);
@@ -305,7 +306,7 @@ namespace CatMart
 
         public void OnItemDamaged(GroceryItem item)
         {
-            ShowToast($"{item.Def.Name} 损坏！要赔 {U.Money(item.Def.Price)}", 3f);
+            ShowToast($"{item.Def.Name} 损坏！要赔 {U.Money(Settlement.DamageCost(item.Def))}（半价）", 3f);
         }
 
         public void OnItemTipped(GroceryItem item)

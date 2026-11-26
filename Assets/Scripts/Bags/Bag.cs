@@ -4,7 +4,8 @@ using UnityEngine;
 namespace CatMart
 {
     public enum BagMaterial { Plastic, Paper }
-    public enum BagSize { Small, Medium, Large }
+    /// <summary>Square = 方底袋（只有塑料的）：底面是正方形，蛋糕、甜甜圈盒这种宽而扁、又不能倒的东西用。</summary>
+    public enum BagSize { Medium, Large, Square }
 
     public struct BagSpec
     {
@@ -18,10 +19,16 @@ namespace CatMart
         public float Stretch => Material == BagMaterial.Plastic ? 0.015f : 0f;
 
         public string MaterialName => Material == BagMaterial.Paper ? "纸袋" : "塑料袋";
-        public string SizeName => Size == BagSize.Small ? "小号" : Size == BagSize.Medium ? "中号" : "大号";
-        public string SizeLetter => Size == BagSize.Small ? "S" : Size == BagSize.Medium ? "M" : "L";
+        public string SizeName => Size == BagSize.Square ? "方底" : Size == BagSize.Medium ? "中号" : "大号";
+        public string SizeLetter => Size == BagSize.Square ? "方" : Size == BagSize.Medium ? "M" : "L";
         public string Name => SizeName + MaterialName;
         public float Volume => Inner.x * Inner.y * Inner.z;
+
+        /// <summary>每种材质有哪些尺寸：塑料 中/大/方底，纸袋 中/大。</summary>
+        public static BagSize[] SizesFor(BagMaterial m) =>
+            m == BagMaterial.Plastic ? new[] { BagSize.Medium, BagSize.Large, BagSize.Square } : new[] { BagSize.Medium, BagSize.Large };
+
+        public static readonly BagSize[] AllSizes = { BagSize.Large, BagSize.Medium, BagSize.Square };
 
         public static BagSpec Get(BagMaterial m, BagSize s)
         {
@@ -31,9 +38,8 @@ namespace CatMart
                 spec.MinSharp = 0.8f; spec.PunctureForce = 40f;
                 switch (s)
                 {
-                    case BagSize.Small: spec.Inner = U.Cm(18, 22, 12); spec.CapacityKg = 5; break;
                     case BagSize.Medium: spec.Inner = U.Cm(28, 30, 17); spec.CapacityKg = 9; break;
-                    default: spec.Inner = U.Cm(32, 40, 20); spec.CapacityKg = 12; break;
+                    default: spec.Inner = U.Cm(34, 40, 22); spec.CapacityKg = 12; break;
                 }
             }
             else
@@ -41,12 +47,27 @@ namespace CatMart
                 spec.MinSharp = 0.4f; spec.PunctureForce = 6f;
                 switch (s)
                 {
-                    case BagSize.Small: spec.Inner = U.Cm(24, 24, 14); spec.CapacityKg = 4; break;
                     case BagSize.Medium: spec.Inner = U.Cm(30, 34, 18); spec.CapacityKg = 7; break;
+                    case BagSize.Square: spec.Inner = U.Cm(30, 28, 30); spec.CapacityKg = 8; break;
                     default: spec.Inner = U.Cm(36, 40, 22); spec.CapacityKg = 10; break;
                 }
             }
             return spec;
+        }
+
+        /// <summary>
+        /// 这件商品能不能好好放进这种袋子：
+        /// 不能倒的东西必须立着放得下（底面放得进袋底，高度不超过袋子太多）；
+        /// 其他东西只要有一种摆法：两条边放得进袋底，第三条边（竖着）不超过袋高的 1.5 倍（重心不高出袋口）。
+        /// </summary>
+        public bool Fits(ItemDefinition d)
+        {
+            Vector3 s = d.Size;
+            float bx = Inner.x + Stretch * 2, bz = Inner.z + Stretch * 2;
+            bool Foot(float a, float b) => (a <= bx && b <= bz) || (a <= bz && b <= bx);
+            if (d.Upright) return Foot(s.x, s.z) && s.y <= Inner.y * 1.15f;
+            float hMax = Inner.y * 1.5f;
+            return (Foot(s.x, s.z) && s.y <= hMax) || (Foot(s.x, s.y) && s.z <= hMax) || (Foot(s.y, s.z) && s.x <= hMax);
         }
     }
 

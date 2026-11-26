@@ -26,7 +26,7 @@ namespace CatMart
             get
             {
                 var parts = new List<string>();
-                foreach (BagSize s in new[] { BagSize.Large, BagSize.Medium, BagSize.Small })
+                foreach (BagSize s in BagSpec.AllSizes)
                     if (Bags.TryGetValue(s, out int n) && n > 0)
                         parts.Add($"{n}个{BagSpec.Get(Material, s).Name}");
                 return string.Join(" + ", parts);
@@ -39,6 +39,8 @@ namespace CatMart
             {
                 string s = $"请用 {BagRequestText} 装喵~";
                 if (Items.Any(i => i.Bulky)) s += "\n大件直接放推车就好";
+                var up = Items.Where(i => i.Upright).Select(i => i.Name).Distinct().ToList();
+                if (up.Count > 0) s += $"\n{string.Join("、", up)}要立着放哦" + (Bags.ContainsKey(BagSize.Square) ? "（方底袋就是给它准备的）" : "");
                 return s;
             }
         }
@@ -88,6 +90,7 @@ namespace CatMart
                 o.Items.Add(d);
             }
 
+            FixMaterial(o);
             // 计算需要的袋子；装不下就去掉最重的非大件商品
             while (!ChooseBags(o) && o.Items.Count > 2)
             {
@@ -114,24 +117,39 @@ namespace CatMart
                 Material = material,
             };
             o.Items.AddRange(items.Where(d => d != null));
+            FixMaterial(o);
             if (!ChooseBags(o)) { o.Bags.Clear(); o.Bags[BagSize.Large] = Mathf.Clamp(o.Items.Count(i => !i.Bulky), 1, 4); }
             o.Items = o.Items.OrderBy(_ => rng.Next()).ToList();
             o.PatienceSeconds = patience > 0 ? patience : 50f + o.Items.Count * 9f;
             return o;
         }
 
-        /// <summary>选出满足体积/重量的最少袋子组合。</summary>
+        /// <summary>这件商品能放进这种材质的哪些袋子。</summary>
+        public static IEnumerable<BagSize> FittingSizes(ItemDefinition d, BagMaterial m) =>
+            BagSpec.SizesFor(m).Where(s => BagSpec.Get(m, s).Fits(d));
+
+        /// <summary>
+        /// 有商品放不进这种材质的任何袋子（比如甜甜圈盒只能立着进方底袋）→ 改用塑料袋；
+        /// 哪种袋子都放不进的商品直接去掉（理论上不会有，自动测试会检查）。
+        /// </summary>
+        static void FixMaterial(CustomerOrder o)
+        {
+            var bagItems = o.Items.Where(i => !i.Bulky).ToList();
+            if (o.Material == BagMaterial.Paper && bagItems.Any(i => !FittingSizes(i, BagMaterial.Paper).Any()))
+                o.Material = BagMaterial.Plastic;
+            o.Items.RemoveAll(i => !i.Bulky && !FittingSizes(i, o.Material).Any());
+        }
+
+        /// <summary>选出满足体积/重量、而且每件商品都有袋子放得下的最少袋子组合。</summary>
         static bool ChooseBags(CustomerOrder o)
         {
             var bagItems = o.Items.Where(i => !i.Bulky).ToList();
             float vol = bagItems.Sum(i => i.Volume);
             float kg = bagItems.Sum(i => i.Mass);
-            float maxDim = 0;
-            foreach (var i in bagItems) maxDim = Mathf.Max(maxDim, MinFitDim(i));
 
             const float fill = 0.5f;       // 不规则物品的装填率
             const float weightMargin = 1.15f;
-            BagSize[] sizes = { BagSize.Small, BagSize.Medium, BagSize.Large };
+            BagSize[] sizes = BagSpec.SizesFor(o.Material);
 
             List<BagSize> best = null;
             float bestCap = float.MaxValue;
@@ -141,15 +159,15 @@ namespace CatMart
                 foreach (var combo in Combos(sizes, n))
                 {
                     float cv = 0, ck = 0;
-                    bool fits = false;
                     foreach (var s in combo)
                     {
                         var spec = BagSpec.Get(o.Material, s);
                         cv += spec.Volume * fill;
                         ck += spec.CapacityKg;
-                        if (MaxBagFitDim(spec) >= maxDim) fits = true;
                     }
-                    if (!fits || cv < vol || ck < kg * weightMargin) continue;
+                    if (cv < vol || ck < kg * weightMargin) continue;
+                    // 每件商品都要有一个袋子放得下（不能倒的要立着放得下）
+                    if (!bagItems.All(i => combo.Any(s => BagSpec.Get(o.Material, s).Fits(i)))) continue;
                     // 每个袋子都至少能分到点东西
                     if (n > bagItems.Count) continue;
                     if (cv < bestCap) { bestCap = cv; best = combo; }
@@ -161,15 +179,6 @@ namespace CatMart
             return true;
         }
 
-        /// <summary>商品放进袋子至少需要的口径（第二长边）。</summary>
-        static float MinFitDim(ItemDefinition d)
-        {
-            var s = d.Size;
-            var a = new[] { s.x, s.y, s.z }.OrderBy(x => x).ToArray();
-            return a[1];
-        }
-
-        static float MaxBagFitDim(BagSpec spec) => Mathf.Max(spec.Inner.x, spec.Inner.z) * 1.05f;
 
         static IEnumerable<List<BagSize>> Combos(BagSize[] sizes, int n, int start = 0)
         {

@@ -108,6 +108,7 @@ namespace CatMart
                 if (LookItem != null && !LookItem.IsDestroyed) Grab(LookItem);
                 else if (LookRack != null) GameManager.I.SpawnBag(LookRack.Spec);
                 else if (LookBell) GameManager.I.FinishOrder();
+                else if (LookBag != null) GameManager.I.RemoveBag(LookBag);   // 点一下空袋子 = 放回袋架（拿错了）
                 else if (Paws != null && !TopView) Paws.Swipe();
             }
             // 松开左键 = 轻放（手带着商品慢慢往下伸，碰到东西才松开）；按住 Shift 松开 = 直接扔下
@@ -491,6 +492,9 @@ namespace CatMart
             var rb = item.Rb;
             rb.useGravity = false;
             rb.WakeUp();
+            // 叫醒附近睡着的商品：被拿走的东西原来压在它们上面，压力要重新算
+            foreach (var o in GroceryItem.Active)
+                if (o != item && o.Rb != null && (o.transform.position - item.transform.position).sqrMagnitude < 0.6f * 0.6f) o.Rb.WakeUp();
             _holdDist = Mathf.Clamp(Vector3.Distance(Cam.transform.position, item.WorldCom), 0.35f, 1.2f);
             _holdRot = Quaternion.Inverse(Quaternion.Euler(0, ViewYaw, 0)) * rb.rotation;
             _lift = 0.06f;

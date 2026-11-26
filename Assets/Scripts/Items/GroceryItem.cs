@@ -7,11 +7,13 @@ namespace CatMart
     /// 一件商品。负责把碰撞力分配到各个部件：
     /// - 来自其他商品、且接触点不在本部件下方的力 → 持续承压
     /// - 任何碰撞的冲量 → 摔/撞
-    /// - 对方部件尖锐度会放大压力 (1 + 3×Sharp)
+    /// - 压坏和扎坏分开算：尖锐物（尖锐度 ≥ 0.3）顶着软包装时压力 ×(1 + 3×Sharp) 算“扎”；罐头、玻璃扎不坏
     /// </summary>
     public class GroceryItem : MonoBehaviour
     {
         public const float SharpMultiplier = 3f;
+        /// <summary>尖锐度达到这个值才算“尖锐”，会扎坏软包装（和属性光边的橙色一致）。</summary>
+        public const float PierceSharp = 0.3f;
 
         public ItemDefinition Def;
         public Rigidbody Rb;
@@ -125,16 +127,22 @@ namespace CatMart
                 // 撞击：整次碰撞的冲量算在一个部件上（手里拿着的不算）
                 if (impactPart == null || otherSharp > impactSharp) { impactPart = part; impactSharp = otherSharp; }
 
-                // 承压：只算其他商品，且接触点不在本部件下方（下方是支撑力）
                 if (other != null)
                 {
+                    float f = perContact / dt;
+                    // 压：只算接触点不在本部件下方的力（下方是支撑力），不管对方尖不尖
                     float below = part.transform.position.y - part.HalfHeightWorld * 0.35f;
-                    if (cp.point.y > below) part.AddLoad(perContact / dt * sharpMul);
+                    if (cp.point.y > below) part.AddLoad(f);
+                    // 扎：对方是尖锐物 + 自己是软包装 → 任何方向都算（放在刀上面也会被扎）
+                    if (otherSharp >= PierceSharp && part.Pierceable) part.AddPierce(f * sharpMul);
                 }
             }
 
             if (impactTotal > 0 && impactPart != null)
-                impactPart.AddImpact(impactTotal * (1f + SharpMultiplier * impactSharp));
+            {
+                bool sharp = impactSharp >= PierceSharp && impactPart.Pierceable;
+                impactPart.AddImpact(sharp ? impactTotal * (1f + SharpMultiplier * impactSharp) : impactTotal, sharp);
+            }
         }
 
         /// <summary>部件损坏。整件商品只计一次赔偿。</summary>
@@ -152,7 +160,7 @@ namespace CatMart
             {
                 IsDamaged = true;
                 string what = cause == DamageCause.Impact ? "摔坏了!" : cause == DamageCause.Pierce ? "被扎破了!" : "压坏了!";
-                FloatText.Spawn(WorldCom + Vector3.up * 0.12f, $"{Def.Name} {what}\n-{U.Money(Def.Price)}", new Color(1f, 0.25f, 0.2f), 0.035f);
+                FloatText.Spawn(WorldCom + Vector3.up * 0.12f, $"{Def.Name} {what}\n-{U.Money(Settlement.DamageCost(Def))}", new Color(1f, 0.25f, 0.2f), 0.035f);
                 if (GameManager.I != null) GameManager.I.OnItemDamaged(this);
             }
 

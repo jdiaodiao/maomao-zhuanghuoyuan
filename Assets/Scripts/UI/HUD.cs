@@ -29,21 +29,21 @@ namespace CatMart
             var font = Fonts.Main;
             int S(int px) => Mathf.RoundToInt(px * _scale);
 
-            _label = new GUIStyle { font = font, fontSize = S(22), richText = true, wordWrap = true };
+            _label = new GUIStyle { font = font, fontSize = S(26), richText = true, wordWrap = true };
             _label.normal.textColor = Color.white;
-            _small = new GUIStyle(_label) { fontSize = S(17) };
+            _small = new GUIStyle(_label) { fontSize = S(21) };
             _small.normal.textColor = new Color(0.85f, 0.87f, 0.9f);
-            _title = new GUIStyle(_label) { fontSize = S(34), fontStyle = FontStyle.Bold };
+            _title = new GUIStyle(_label) { fontSize = S(40), fontStyle = FontStyle.Bold };
             _title.normal.textColor = Orange;
             _big = new GUIStyle(_label) { fontSize = S(60), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             _big.normal.textColor = Orange;
             _center = new GUIStyle(_label) { alignment = TextAnchor.MiddleCenter };
-            _mono = new GUIStyle(_label) { fontSize = S(17), wordWrap = false };
+            _mono = new GUIStyle(_label) { fontSize = S(20), wordWrap = false };
             _mono.normal.textColor = new Color(0.15f, 0.15f, 0.2f);
             _panel = new GUIStyle { padding = new RectOffset(S(18), S(18), S(14), S(14)) };
             _panel.normal.background = _bg;
             if (ArtStyle.Cozy) _panel.border = new RectOffset(14, 14, 14, 14);
-            _button = new GUIStyle { font = font, fontSize = S(26), alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+            _button = new GUIStyle { font = font, fontSize = S(28), alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
             Color btn = ArtStyle.Cozy ? U.Hex("#F7A440") : Orange;
             _button.normal.background = ArtStyle.Cozy ? Rounded(btn) : Tex(btn);
             if (ArtStyle.Cozy) _button.border = new RectOffset(14, 14, 14, 14);
@@ -100,35 +100,82 @@ namespace CatMart
 
         // ------------------------------------------------------------ 开场
         public static bool TestBrief;
+        public static bool RulesPage;
 
-        /// <summary>测试关说明：这次改了什么、每一单测什么。</summary>
+        /// <summary>居中的大面板（开场、说明页用）：尽量大，但不超出屏幕。</summary>
+        Rect BigPanel(float w, float h)
+        {
+            w = Mathf.Min(S(w), Screen.width - S(32));
+            h = Mathf.Min(S(h), Screen.height - S(32));
+            return new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
+        }
+
+        /// <summary>测试关说明：这次改了什么（带编号）、每一单测什么。</summary>
         void DrawTestBrief()
         {
-            float w = S(980), h = S(760);
-            var r = new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
-            GUILayout.BeginArea(r, _panel);
+            GUILayout.BeginArea(BigPanel(1180, 1000), _panel);
             GUILayout.Label("测试关", _title);
             GUILayout.Label($"<color=#AAAAAA>{TestLevel.Version} · 不存档，不影响正式关卡和钱包</color>", _small);
-            GUILayout.Space(S(10));
+            GUILayout.Space(S(8));
             var sb = new StringBuilder();
-            sb.AppendLine("<color=#F2C14E><b>这次改了什么 / 要看什么</b></color>");
-            foreach (var line in TestLevel.Checklist) sb.AppendLine("□ " + line);
+            sb.AppendLine("<color=#F2C14E><b>这次要测的项目</b></color>（测完告诉我哪几号没问题）");
+            for (int i = 0; i < TestLevel.Checklist.Length; i++) sb.AppendLine($"<b>{i + 1}.</b> {TestLevel.Checklist[i]}");
             sb.AppendLine();
             sb.AppendLine("<color=#F2C14E><b>四位顾客</b></color>");
             for (int i = 0; i < TestLevel.Orders.Length; i++)
             {
                 var o = TestLevel.Orders[i];
                 var names = string.Join("、", o.Items.Select(id => ItemCatalog.Get(id)?.Name ?? $"<color=#FF6B5B>{id}?</color>"));
-                sb.AppendLine($"{i + 1}. {(o.Memory ? "<color=#C7A6FF>[记忆单]</color> " : "")}{o.Note}");
-                sb.AppendLine($"   <color=#AAAAAA>{names}</color>");
+                sb.AppendLine($"顾客{i + 1}  {(o.Memory ? "<color=#C7A6FF>[记忆单]</color> " : "")}{o.Note}");
+                sb.AppendLine($"        <color=#AAAAAA>{names}</color>");
             }
-            GUILayout.Label(sb.ToString(), _small);
+            GUILayout.Label(sb.ToString(), _label);
             GUILayout.FlexibleSpace();
             GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("返回", _button, GUILayout.Width(S(160)), GUILayout.Height(S(56)))) TestBrief = false;
+            if (GUILayout.Button("返回", _button, GUILayout.Width(S(160)), GUILayout.Height(S(58)))) TestBrief = false;
             GUILayout.Space(S(12));
-            if (GUILayout.Button("开始测试 ▶", _button, GUILayout.Width(S(260)), GUILayout.Height(S(56)))) { TestBrief = false; G.StartTestLevel(); }
+            if (GUILayout.Button("开始测试 ▶", _button, GUILayout.Width(S(260)), GUILayout.Height(S(58)))) { TestBrief = false; G.StartTestLevel(); }
+            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
+        }
+
+        /// <summary>完整的计分规则（数字都从代码里的常量读，改了规则这里自动跟着变）。</summary>
+        void DrawRules()
+        {
+            GUILayout.BeginArea(BigPanel(1180, 1000), _panel);
+            GUILayout.Label("计分规则", _title);
+            GUILayout.Space(S(6));
+            var t = Settlement.TipTiers;
+            string rules =
+                "<color=#F2C14E><b>每一单的钱</b></color>\n" +
+                $"工钱 = 订单总价 × {Settlement.Commission * 100:0}% × 总倍率\n" +
+                "本单实得 = 工钱 + 小费 − 赔偿\n\n" +
+                "<color=#F2C14E><b>总倍率 = 下面几项相乘</b></color>\n" +
+                "· 规格：袋子材质、尺寸、个数完全对 ×1.2；个数/尺寸不对 ×0.8；材质不对 ×0.6\n" +
+                "· 平衡：每个袋子的重心偏离中心多少（按重量加权）\n" +
+                "      很居中 ×1.3  →  略偏 ×1.0  →  一边重 ×0.6  →  严重偏 ×0.5\n" +
+                "      袋子被扎破最多 ×0.5，超重最多 ×0.4；高出袋口不稳每件再 ×0.8\n" +
+                $"· 漏装：每漏一件 ×0.9（大件放推车不算漏装）\n" +
+                $"· 翻倒：每倒过一件“不能倒”的东西 ×{Settlement.TippedPerItem}（最低 ×{Settlement.TippedFloor}）\n" +
+                $"· 耐心：顾客等到没耐心了 ×{Settlement.ImpatientFactor}\n" +
+                $"· 记忆单：每天最后一单 ×{Settlement.MemoryBonus}\n\n" +
+                "<color=#F2C14E><b>小费（看完成时顾客还剩多少耐心）</b></color>\n" +
+                $"剩 ≥{t[0].Min * 100:0}% ♥♥♥ 订单总价的 {t[0].Rate * 100:0.#}%  ·  剩 ≥{t[1].Min * 100:0}% ♥♥ {t[1].Rate * 100:0.#}%  ·  还剩一点 ♥ {t[2].Rate * 100:0.#}%\n" +
+                "弄坏东西、漏装、或者顾客等到没耐心 → 没有小费\n\n" +
+                "<color=#F2C14E><b>赔偿</b></color>\n" +
+                $"弄坏（压坏 / 扎坏 / 摔坏）的商品，按价格的 {Settlement.DamageRate * 100:0}% 赔\n\n" +
+                "<color=#F2C14E><b>星星（只看装得好不好，不算记忆单加成和小费）</b></color>\n" +
+                "总倍率 ≥1.4 ★★★  ·  ≥1.0 ★★  ·  ≥0.6 ★  ·  更低 没有星\n" +
+                "这一单弄坏了任何东西 → 再扣一颗星\n\n" +
+                "<color=#F2C14E><b>过关</b></color>\n" +
+                $"每天 {GameManager.CustomersPerDay} 位顾客，今日收入 ≥ 目标金额就过关\n" +
+                "目标 = 当天所有订单的基础工钱 × 目标比例（第 1 关 0.9，每关 +0.1，最高 1.35）";
+            GUILayout.Label(rules, _label);
+            GUILayout.FlexibleSpace();
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("返回", _button, GUILayout.Width(S(200)), GUILayout.Height(S(58)))) RulesPage = false;
             GUILayout.EndHorizontal();
             GUILayout.EndArea();
         }
@@ -136,37 +183,42 @@ namespace CatMart
         void DrawIntro()
         {
             if (TestBrief) { DrawTestBrief(); return; }
-            float w = S(980), h = S(760);
-            var r = new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
-            GUILayout.BeginArea(r, _panel);
+            if (RulesPage) { DrawRules(); return; }
+            GUILayout.BeginArea(BigPanel(1180, 1000), _panel);
             GUILayout.Label("猫猫装货员", _big);
             GUILayout.Label("第一章 · CatMart 超市装货员", new GUIStyle(_title) { alignment = TextAnchor.MiddleCenter });
-            GUILayout.Space(S(14));
-            GUILayout.Label(
-                "你是 CatMart 喵喵超市 3 号收银台的装袋员。上游的收银猫扫描好的商品会顺着传送带送到你面前，" +
-                "请按顾客的要求，用指定数量和尺寸的<b>塑料袋</b>或<b>纸袋</b>把商品装好。\n\n" +
-                "<color=#F2C14E>评分</color>：袋子里的<b>重心要居中</b>（不能一边重一边轻）、袋子<b>规格要对</b>、" +
-                "<b>不能压坏</b>商品（压坏要按原价赔！）。尖锐的东西会扎破塑料袋和软商品，玻璃瓶和鸡蛋摔不得。" +
-                "大件（整箱水、猫砂…）直接放顾客的购物车。" +
-                "<color=#5FE08A>不能倒</color>的东西（蛋糕、插花…）要一直立着，倒了扣分。商品外侧的光边提示它的属性：" +
-                "白=普通 <color=#FFD84D>黄=怕压</color> <color=#FF7FB6>粉=易摔碎</color> <color=#FF8A3D>橙=尖锐</color> <color=#6FC3FF>蓝=大件</color> <color=#5FE08A>绿=不能倒</color>（多种属性会轮流变色）。\n\n" +
-                $"<color=#F2C14E>关卡</color>：每天是一关，接待 {GameManager.CustomersPerDay} 位顾客，<b>今日收入达到目标金额</b>才能过关。" +
-                "工钱 = 订单总价 × 10% × 评分倍率 + <color=#7CFC9A>小费</color> − 赔偿。装得越快小费越多（顾客耐心条上有三档）。\n" +
-                $"每天最后一位是<color=#C7A6FF><b>记忆单</b></color>：没有光边和属性说明，商品都是今天见过的，工钱 ×{Settlement.MemoryBonus:0.0}。", _label);
             GUILayout.Space(S(10));
+            GUILayout.Label(
+                "你是 CatMart 喵喵超市 3 号收银台的装袋员。\n" +
+                "商品会顺着传送带送过来，按顾客的要求用指定的<b>塑料袋</b>或<b>纸袋</b>装好。\n\n" +
+                "<color=#F2C14E><b>怎么装得好</b></color>\n" +
+                "· 袋子<b>材质、尺寸、个数</b>要和顾客说的一样\n" +
+                "· 袋子里<b>重心要居中</b>，不要一边重一边轻\n" +
+                "· 别<b>压坏、扎坏、摔坏</b>商品（弄坏要赔半价）\n" +
+                "· <color=#5FE08A>不能倒</color>的东西（蛋糕、插花…）一直立着放，方底袋就是给它们准备的\n" +
+                "· 大件（整箱水、猫砂…）直接放顾客的购物车\n" +
+                "· 装得越快，<color=#7CFC9A>小费</color>越多\n\n" +
+                "<color=#F2C14E><b>商品光边的颜色</b></color>\n" +
+                "白 普通   <color=#FFD84D>黄 怕压</color>   <color=#FF7FB6>粉 易摔碎</color>   <color=#FF8A3D>橙 尖锐</color>   <color=#6FC3FF>蓝 大件</color>   <color=#5FE08A>绿 不能倒</color>\n\n" +
+                "<color=#F2C14E><b>关卡</b></color>\n" +
+                $"每天一关，{GameManager.CustomersPerDay} 位顾客，今日收入达到目标金额就过关。\n" +
+                $"每天最后一位是<color=#C7A6FF><b>记忆单</b></color>：没有光边和属性说明，工钱 ×{Settlement.MemoryBonus:0.0}。", _label);
+            GUILayout.Space(S(8));
             GUILayout.Label(ControlsText(), _small);
             GUILayout.FlexibleSpace();
             GUILayout.Label($"第 {G.Day} 关   钱包 {U.Money(G.Money)}", _label);
             GUILayout.Space(S(6));
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button($"画风：{ArtStyle.Name}", _button, GUILayout.Width(S(220)), GUILayout.Height(S(56)))) ArtStyle.Toggle();
+            if (GUILayout.Button($"画风：{ArtStyle.Name}", _button, GUILayout.Width(S(220)), GUILayout.Height(S(58)))) ArtStyle.Toggle();
+            GUILayout.Space(S(12));
+            if (GUILayout.Button("计分规则", _button, GUILayout.Width(S(170)), GUILayout.Height(S(58)))) RulesPage = true;
             GUILayout.Space(S(12));
             if (G.Day > 1 || G.Money != 0)
-                if (GUILayout.Button("重置存档", _button, GUILayout.Width(S(160)), GUILayout.Height(S(56)))) G.ResetProgress();
+                if (GUILayout.Button("重置存档", _button, GUILayout.Width(S(170)), GUILayout.Height(S(58)))) G.ResetProgress();
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("测试关", _button, GUILayout.Width(S(160)), GUILayout.Height(S(56)))) TestBrief = true;
+            if (GUILayout.Button("测试关", _button, GUILayout.Width(S(160)), GUILayout.Height(S(58)))) TestBrief = true;
             GUILayout.Space(S(12));
-            if (GUILayout.Button("开始营业 ▶", _button, GUILayout.Width(S(260)), GUILayout.Height(S(56)))) G.StartDay();
+            if (GUILayout.Button("开始营业 ▶", _button, GUILayout.Width(S(240)), GUILayout.Height(S(58)))) G.StartDay();
             GUILayout.EndHorizontal();
             GUILayout.EndArea();
         }
@@ -196,15 +248,23 @@ namespace CatMart
         }
 
         static string ControlsText() =>
-            "鼠标 看   WASD 移动   左键按住 抓起（松开=轻放，Shift+松开=扔下）   <color=#F2C14E>右键按住 按压</color>（圆圈变红就停）\n" +
-            "滚轮 抬高/放低   Q/E 水平转   R/F 前后翻   C 侧放   Z 回正   X 收回空袋\n" +
-            "<color=#F2C14E><b>V 俯视装袋</b></color>   Tab 小票   B 重心标记   Enter 完成订单   H 隐藏帮助   M 静音  -/= 音量   <color=#F2C14E>Esc/P 暂停</color>";
+            "<color=#F2C14E>拿放</color>  左键按住 抓起 · 松开 轻放 · Shift+松开 扔下 · 右键按住 按压（圆圈变红就停）\n" +
+            "<color=#F2C14E>旋转</color>  Q/E 水平转 · R/F 前后翻 · C 侧放 · Z 回正 · 滚轮 抬高/放低\n" +
+            "<color=#F2C14E>袋子</color>  点袋架 取袋子 · 点空袋子 放回 · <b>V 俯视装袋</b> · B 重心标记 · Enter 完成订单\n" +
+            "<color=#F2C14E>其他</color>  鼠标 看 · WASD 移动 · Tab 小票 · H 隐藏帮助 · M 静音 · -/= 音量 · <b>Esc/P 暂停</b>";
+
+        /// <summary>按文字算面板高度（含上下内边距）。</summary>
+        float PanelH(GUIStyle st, string text, float panelW) =>
+            st.CalcHeight(new GUIContent(text), panelW - _panel.padding.horizontal) + _panel.padding.vertical;
 
         // ------------------------------------------------------------ 营业中
+        const float TopW = 640, TopH = 138;
+        float _reqBottom;   // 顾客要求面板的下沿（小票接在下面）
+
         void DrawServingTop()
         {
             // 左上：状态
-            var r = new Rect(S(16), S(16), S(560), S(TopH));
+            var r = new Rect(S(16), S(16), S(TopW), S(TopH));
             GUILayout.BeginArea(r, _panel);
             GUILayout.Label((G.IsTest ? "<b><color=#7FD6FF>测试关</color></b>" : $"<b>第 {G.Day} 关</b>") + $" · 顾客 {Mathf.Min(G.CustomerIndex + (G.Phase == GameManager.State.Serving ? 1 : 0), GameManager.CustomersPerDay)}/{GameManager.CustomersPerDay}" +
                             $"   <color=#AAAAAA>钱包 {U.Money(G.Money)}</color>", _label);
@@ -213,7 +273,7 @@ namespace CatMart
                             (G.DayPassed ? "  <color=#7CFC9A>达标！</color>" : ""), _label);
             GUILayout.EndArea();
             // 目标进度条
-            var bar = new Rect(r.x + S(18), r.yMax - S(24), r.width - S(36), S(12));
+            var bar = new Rect(r.x + S(18), r.yMax - S(26), r.width - S(36), S(12));
             float p = G.DayGoal > 0 ? Mathf.Clamp01(G.DayEarned / G.DayGoal) : 0;
             GUI.color = new Color(0.25f, 0.25f, 0.28f);
             GUI.DrawTexture(bar, _white);
@@ -222,8 +282,6 @@ namespace CatMart
             GUI.color = Color.white;
         }
 
-        const float TopH = 118;
-
         void DrawServing()
         {
             DrawServingTop();
@@ -231,25 +289,28 @@ namespace CatMart
             if (o == null) return;
 
             // 左上：顾客要求 + 耐心（不挡住正前方的顾客）
-            float w = S(560);
-            string testNote = G.TestNote;
-            var rr = new Rect(S(16), S(TopH + 24), w, S(140 + (o.Memory ? 28 : 0) + (testNote != null ? 28 : 0)));
-            GUILayout.BeginArea(rr, _panel);
-            if (testNote != null) GUILayout.Label($"<color=#7FD6FF><b>测试</b></color> {testNote}", _small);
-            if (o.Memory) GUILayout.Label($"<color=#C7A6FF><b>记忆单</b></color> <color=#AAAAAA>没有光边和属性说明 · 工钱 ×{Settlement.MemoryBonus:0.0}</color>", _small);
-            GUILayout.Label($"<b>{o.CustomerName}</b> 的要求：<color=#F2C14E><b>{o.BagRequestText}</b></color>" +
-                            (o.Items.Any(i => i.Bulky) ? "  <color=#6FC3FF>（大件放推车）</color>" : ""), _label);
-            GUILayout.Label($"订单 {o.Items.Count} 件 · 总价 {U.Money(o.ItemsTotal)} · 基础工钱 {U.Money(o.ItemsTotal * Settlement.Commission)}", _small);
-            // 当前小费档次
+            float w = S(TopW);
             float p = G.Patience01;
             int tier = -1;
             for (int i = 0; i < Settlement.TipTiers.Length; i++) if (p >= Settlement.TipTiers[i].Min) { tier = i; break; }
-            string tipText = tier >= 0
-                ? $"耐心 · 现在完成可得小费 <color=#7CFC9A>{U.Money(o.ItemsTotal * Settlement.TipTiers[tier].Rate)}</color> <color=#AAAAAA>({new string('♥', Settlement.TipTiers.Length - tier)})</color>"
-                : $"<color=#FF6B5B>顾客等急了：没有小费，工钱 ×{Settlement.ImpatientFactor:0.00}</color>";
-            GUILayout.Label(tipText, _small);
+            var lines = new System.Collections.Generic.List<(string text, GUIStyle st)>();
+            if (G.TestNote != null) lines.Add(($"<color=#7FD6FF><b>测试</b></color> {G.TestNote}", _small));
+            if (o.Memory) lines.Add(($"<color=#C7A6FF><b>记忆单</b></color> <color=#AAAAAA>没有光边和属性说明 · 工钱 ×{Settlement.MemoryBonus:0.0}</color>", _small));
+            lines.Add(($"<b>{o.CustomerName}</b> 的要求：<color=#F2C14E><b>{o.BagRequestText}</b></color>" +
+                       (o.Items.Any(i => i.Bulky) ? "\n<color=#6FC3FF>大件放推车</color>" : ""), _label));
+            lines.Add(($"订单 {o.Items.Count} 件 · 总价 {U.Money(o.ItemsTotal)} · 基础工钱 {U.Money(o.ItemsTotal * Settlement.Commission)}", _small));
+            lines.Add((tier >= 0
+                ? $"现在完成可得小费 <color=#7CFC9A>{U.Money(o.ItemsTotal * Settlement.TipTiers[tier].Rate)}</color> <color=#AAAAAA>({new string('♥', Settlement.TipTiers.Length - tier)})</color>"
+                : $"<color=#FF6B5B>顾客等急了：没有小费，工钱 ×{Settlement.ImpatientFactor:0.00}</color>", _small));
+            float inner = w - _panel.padding.horizontal;
+            float h = _panel.padding.vertical + S(26);
+            foreach (var l in lines) h += l.st.CalcHeight(new GUIContent(l.text), inner);
+            var rr = new Rect(S(16), S(16 + TopH + 10), w, h);
+            _reqBottom = rr.yMax;
+            GUILayout.BeginArea(rr, _panel);
+            foreach (var l in lines) GUILayout.Label(l.text, l.st);
             GUILayout.EndArea();
-            var bar = new Rect(rr.x + S(18), rr.yMax - S(24), w - S(36), S(12));
+            var bar = new Rect(rr.x + S(18), rr.yMax - S(26), w - S(36), S(12));
             GUI.color = new Color(0.25f, 0.25f, 0.28f);
             GUI.DrawTexture(bar, _white);
             GUI.color = Color.Lerp(new Color(1f, 0.3f, 0.25f), new Color(0.35f, 0.9f, 0.4f), p);
@@ -274,24 +335,28 @@ namespace CatMart
                 string kg = s.Overweight ? $"<color=#FF6B5B>{s.Mass:0.0}/{b.Spec.CapacityKg}kg</color>" : $"{s.Mass:0.0}/{b.Spec.CapacityKg}kg";
                 sb.AppendLine($"{i + 1}号 {b.Spec.Name} {s.Count}件 {kg} 偏心 <color={col}>{bal}</color>" + (s.Unstable > 0 ? $" <color=#FFB347>高出{s.Unstable}</color>" : "") + (b.Torn ? " <color=#FF6B5B>破</color>" : ""));
             }
-            var rp = new Rect(Screen.width - S(470), S(16), S(454), S(186));
+            string side = sb.ToString().TrimEnd();
+            float rw = S(560);
+            var rp = new Rect(Screen.width - rw - S(16), S(16), rw, PanelH(_small, side, rw));
             GUILayout.BeginArea(rp, _panel);
-            GUILayout.Label(sb.ToString(), _small);
+            GUILayout.Label(side, _small);
             GUILayout.EndArea();
 
             // 准星（俯视模式用鼠标指针，不画准星）
             if (P != null && P.TopView)
             {
+                string tv = P.Held != null
+                    ? "<b>俯视装袋</b> · 移动鼠标摆放 · 松开 轻放到底 · Shift+松开 扔下\n滚轮 抬高/放低 · Q/E R/F C Z 旋转"
+                    : "<b>俯视装袋</b> · 左键拿 · 右键按压 · WASD 平移 · 滚轮 缩放\n1-4 跳到袋位 · 5 购物车 · V/Esc 返回 · P 暂停";
                 float tw = S(980);
-                var tr = new Rect((Screen.width - tw) / 2, Screen.height - S(168), tw, S(44));
+                float th = PanelH(_center, tv, tw);
+                var tr = new Rect((Screen.width - tw) / 2, Screen.height - HelpH() - th - S(24), tw, th);
                 GUI.Box(tr, GUIContent.none, _panel);
-                GUI.Label(tr, P.Held != null
-                    ? "<b>俯视装袋</b> · 移动鼠标摆放 · 松开=轻放到底 · Shift+松开=扔下 · 滚轮 抬高/放低 · Q/E R/F C Z 旋转"
-                    : "<b>俯视装袋</b> · 左键拿 · 右键按压 · WASD 平移 · 滚轮 缩放 · 1-4 袋位 · 5 购物车 · V/Esc 返回 · P 暂停", _center);
+                GUI.Label(tr, tv, _center);
             }
             else if (P != null && P.CursorLocked)
             {
-                bool hot = P.LookItem != null || P.LookRack != null || P.LookBell || P.Held != null;
+                bool hot = P.LookItem != null || P.LookRack != null || P.LookBell || P.LookBag != null || P.Held != null;
                 float cs = S(hot ? 10 : 6);
                 GUI.color = hot ? Orange : new Color(1, 1, 1, 0.8f);
                 GUI.DrawTexture(new Rect(Screen.width / 2f - cs / 2, Screen.height / 2f - cs / 2, cs, cs), _white);
@@ -307,15 +372,17 @@ namespace CatMart
             // 提示
             if (G.Toast != null)
             {
-                float tw = S(760);
-                var tr = new Rect((Screen.width - tw) / 2, Screen.height * 0.66f, tw, S(52));
+                float tw = S(900);
+                float th = PanelH(_center, G.Toast, tw);
+                var tr = new Rect((Screen.width - tw) / 2, Screen.height * 0.62f, tw, th);
                 GUI.Box(tr, GUIContent.none, _panel);
                 GUI.Label(tr, G.Toast, _center);
             }
 
             if (G.ShowHelp)
             {
-                var hr = new Rect(S(16), Screen.height - S(110), S(1020), S(96));
+                float hw = S(1120), hh = HelpH();
+                var hr = new Rect(S(16), Screen.height - hh - S(14), hw, hh);
                 GUILayout.BeginArea(hr, _panel);
                 GUILayout.Label(ControlsText(), _small);
                 GUILayout.EndArea();
@@ -323,6 +390,9 @@ namespace CatMart
 
             if (G.ShowReceipt) DrawReceipt();
         }
+
+        /// <summary>底部帮助栏的高度（隐藏时为 0）。</summary>
+        float HelpH() => G.ShowHelp ? PanelH(_small, ControlsText(), S(1120)) : 0;
 
         void DrawTooltip()
         {
@@ -336,11 +406,16 @@ namespace CatMart
                 sb.Append($"<b>{d.Name}</b>  <color=#AAAAAA>{d.CategoryName}</color>\n");
                 sb.Append($"{U.Money(d.Price)} · {d.Mass:0.00} kg");
                 // 属性说明（颜色和商品光边一致）；靠记忆的关卡不显示
-                if (G.TraitHints) sb.Append(" · " + ItemTraits.RichText(d));
-                float maxLoad = it.Parts.Count > 0 ? it.Parts.Max(p => p.LoadRatio) : 0;
-                if (it.IsDamaged) sb.Append("\n<color=#FF6B5B>已损坏</color>");
+                if (G.TraitHints) sb.Append("\n" + ItemTraits.RichText(d));
+                float crush = it.Parts.Count > 0 ? it.Parts.Max(p => p.CrushRatio) : 0;
+                float pierce = it.Parts.Count > 0 ? it.Parts.Max(p => p.PierceRatio) : 0;
+                if (it.IsDamaged) sb.Append("\n<color=#FF6B5B>已损坏（" + (it.LastCause == DamageCause.Pierce ? "被扎破" : it.LastCause == DamageCause.Impact ? "摔坏" : "压坏") + "）</color>");
                 else if (P.Held == null && G.Slots.Any(bg => bg != null && bg.Contains(it) && bg.AboveRim(it))) sb.Append("\n<color=#FFB347>质心高出袋口，不稳！</color>");
-                else if (maxLoad > 0.3f) sb.Append($"\n<color={(maxLoad > 0.8f ? "#FF6B5B" : "#F2C14E")}>受压 {maxLoad * 100:0}%</color>");
+                else
+                {
+                    if (crush > 0.3f) sb.Append($"\n<color={(crush > 0.8f ? "#FF6B5B" : "#F2C14E")}>受压 {crush * 100:0}%</color>");
+                    if (pierce > 0.3f) sb.Append($"\n<color={(pierce > 0.8f ? "#FF6B5B" : "#FF8A3D")}>被尖东西顶着 {pierce * 100:0}%</color>");
+                }
                 if (P.Held != null) sb.Append("\n<color=#AAAAAA>Q/E R/F 旋转 · C 侧放 · Z 回正 · 滚轮 抬高/放低</color>");
                 text = sb.ToString();
             }
@@ -349,12 +424,13 @@ namespace CatMart
                 var b = P.LookBag;
                 var s = b.Compute();
                 text = $"<b>{b.Spec.Name}</b>  承重 {b.Spec.CapacityKg} kg\n{s.Count} 件 · {s.Mass:0.0} kg · 重心偏移 {s.Imbalance * 100:0}%" +
-                       (b.Torn ? "\n<color=#FF6B5B>已被刺破</color>" : "") + (s.Count == 0 ? "\n<color=#AAAAAA>按 X 收回</color>" : "");
+                       (b.Torn ? "\n<color=#FF6B5B>已被刺破</color>" : "") + (s.Count == 0 ? "\n<color=#AAAAAA>点一下放回袋架（拿错了也没关系）</color>" : "");
             }
             else if (P.LookRack != null)
             {
                 var s = P.LookRack.Spec;
-                text = $"<b>{s.Name}</b>（点击取一个）\n内尺寸 {s.Inner.x * 100:0}×{s.Inner.y * 100:0}×{s.Inner.z * 100:0} cm · 承重 {s.CapacityKg} kg" +
+                text = $"<b>{s.Name}</b>（点一下取一个）\n内尺寸 宽{s.Inner.x * 100:0} × 高{s.Inner.y * 100:0} × 深{s.Inner.z * 100:0} cm · 承重 {s.CapacityKg} kg" +
+                       (s.Size == BagSize.Square ? "\n<color=#5FE08A>底是方的，蛋糕这种宽的东西能立着放</color>" : "") +
                        (s.Material == BagMaterial.Plastic ? "\n<color=#FF8A3D>怕尖锐物品</color>" : "\n<color=#AAAAAA>耐扎，但不能超重</color>");
             }
             else if (P.LookBell)
@@ -362,11 +438,12 @@ namespace CatMart
                 text = "<b>猫铃</b>：装好了就按一下，完成这一单 (Enter)";
             }
             if (text == null) return;
-            float w = S(560);
+            float w = S(620);
+            float h = PanelH(_small, text, w);
             // 第一人称：准星右下；俯视：固定在右下角，不挡住正在摆放的位置
             var r = P.TopView
-                ? new Rect(Screen.width - w - S(16), Screen.height - S(300), w, S(130))
-                : new Rect(Screen.width / 2f + S(24), Screen.height / 2f + S(24), w, S(130));
+                ? new Rect(Screen.width - w - S(16), Screen.height - HelpH() - h - S(90), w, h)
+                : new Rect(Screen.width / 2f + S(24), Screen.height / 2f + S(24), w, h);
             GUILayout.BeginArea(r, _panel);
             GUILayout.Label(text, _small);
             GUILayout.EndArea();
@@ -375,10 +452,10 @@ namespace CatMart
         void DrawReceipt()
         {
             var lines = G.Store.Receipt.FullText();
-            float w = S(420);
-            int count = G.Store.Receipt.Lines.Count;
-            float h = Mathf.Min(Screen.height - S(380), S(60) + count * S(24));
-            var r = new Rect(S(16), S(TopH + 24 + 180), w, h);
+            float w = S(460);
+            float y = _reqBottom + S(10);
+            float h = Mathf.Min(Screen.height - y - HelpH() - S(24), _mono.CalcHeight(new GUIContent(lines), w) + _panel.padding.vertical);
+            var r = new Rect(S(16), y, w, h);
             var st = new GUIStyle(_panel);
             st.normal.background = _bgLight;
             GUILayout.BeginArea(r, st);
@@ -391,11 +468,11 @@ namespace CatMart
         {
             var res = G.LastResult;
             if (res == null) return;
-            float w = S(820), h = S(780);
-            var r = new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
+            var r = BigPanel(1000, 760);
             GUILayout.BeginArea(r, _panel);
             GUILayout.Label($"订单结算  {new string('★', res.Stars)}{new string('☆', 3 - res.Stars)}", _title);
             GUILayout.Space(S(6));
+            GUILayout.Label("<color=#AAAAAA>星星看总倍率（不算记忆单加成）：≥1.4 ★★★ · ≥1.0 ★★ · ≥0.6 ★；弄坏东西再扣一颗</color>", _small);
             var sb = new StringBuilder();
             sb.AppendLine($"订单总价 {U.Money(res.ItemsTotal)} × 提成 10% = 基础工钱 <b>{U.Money(res.BasePay)}</b>");
             sb.AppendLine();
@@ -418,7 +495,7 @@ namespace CatMart
                 ? $"小费 <color=#7CFC9A><b>+{U.Money(res.Tip)}</b></color>   <color=#AAAAAA>{new string('♥', res.TipTier)} {res.TipNote}</color>"
                 : $"小费 $0.00   <color=#AAAAAA>{res.TipNote}</color>");
             if (res.DamagedNames.Count > 0)
-                sb.AppendLine($"赔偿 <color=#FF6B5B><b>-{U.Money(res.DamagePenalty)}</b></color>   <color=#AAAAAA>{string.Join("、", res.DamagedNames.Take(5))}</color>");
+                sb.AppendLine($"赔偿（半价） <color=#FF6B5B><b>-{U.Money(res.DamagePenalty)}</b></color>   <color=#AAAAAA>{string.Join("、", res.DamagedNames.Take(5))}</color>");
             sb.AppendLine();
             string netCol = res.Net >= 0 ? "#7CFC9A" : "#FF6B5B";
             sb.AppendLine($"<size={Mathf.RoundToInt(S(32))}>本单实得 <color={netCol}><b>{U.Money(res.Net)}</b></color></size>");
@@ -437,8 +514,7 @@ namespace CatMart
 
         void DrawDaySummary()
         {
-            float w = S(720), h = S(560);
-            var r = new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
+            var r = BigPanel(900, 680);
             GUILayout.BeginArea(r, _panel);
             GUILayout.Label(G.DayPassed ? $"第 {G.Day} 关 过关啦！" : $"第 {G.Day} 关 没达标…", _title);
             var sb = new StringBuilder();

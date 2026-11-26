@@ -20,6 +20,15 @@ namespace CatMart
             Directory.CreateDirectory(_dir);
             var g = GameManager.I;
             Log($"商品数量 {ItemCatalog.All.Count}");
+            // 每件商品能放进哪些袋子（不能倒的要立着放得下）
+            foreach (var d in ItemCatalog.All.Where(x => !x.Bulky))
+            {
+                var pl = OrderGenerator.FittingSizes(d, BagMaterial.Plastic).ToList();
+                var pa = OrderGenerator.FittingSizes(d, BagMaterial.Paper).ToList();
+                if (pl.Count == 3 && pa.Count == 2) continue;
+                Log($"袋子适配: {d.Name}{(d.Upright ? "[不能倒]" : "")} 尺寸 {d.Size.x * 100:0}×{d.Size.y * 100:0}×{d.Size.z * 100:0}cm 塑料[{string.Join(",", pl)}] 纸[{string.Join(",", pa)}]" +
+                    (pl.Count + pa.Count == 0 ? " ← 哪个袋子都放不下!" : ""));
+            }
             yield return new WaitForSeconds(0.5f);
             yield return Shot("0_intro");
 
@@ -70,7 +79,7 @@ namespace CatMart
                 }
                 else
                 {
-                    var target = load.OrderBy(kv => kv.Value / kv.Key.Spec.CapacityKg).First().Key;
+                    var target = load.Where(kv => kv.Key.Spec.Fits(it.Def)).DefaultIfEmpty(load.First()).OrderBy(kv => kv.Value / kv.Key.Spec.CapacityKg).First().Key;
                     load[target] += it.Def.Mass;
                     var top = HighestPoint(target);
                     Place(it, target.transform.position + new Vector3(0, top + 0.015f, 0), target);
@@ -147,13 +156,18 @@ namespace CatMart
             yield return new WaitForSeconds(1.0f);
             var milk = ItemFactory.Create(ItemCatalog.Get("milk_gallon"), new Vector3(0.64f, top0 + 0.3f, 0.25f), Quaternion.identity);
             var soup = ItemFactory.Create(ItemCatalog.Get("canned_soup"), new Vector3(0.22f, top0 + 0.2f, 0.2f), Quaternion.identity);
+            // 5) 扎坏：面包上放水果刀（尖锐 0.85），刀上再压一个罐头
+            var bread2 = ItemFactory.Create(ItemCatalog.Get("bread"), new Vector3(0.36f, top0 + 0.065f, -0.08f), Quaternion.identity);
+            var knife = ItemFactory.Create(ItemCatalog.Get("knife"), new Vector3(0.36f, top0 + 0.17f, -0.08f), Quaternion.identity);
+            var knifeWeight = ItemFactory.Create(ItemCatalog.Get("canned_beans"), new Vector3(0.36f, top0 + 0.26f, -0.08f), Quaternion.identity);
             var bag = g.Slots.First(b => b != null);
             var skewers = ItemFactory.Create(ItemCatalog.Get("skewers"), bag.transform.position + new Vector3(0, 0.03f, 0), Quaternion.Euler(0, 0, 90 - 90));
             var detergent = ItemFactory.Create(ItemCatalog.Get("detergent"), bag.transform.position + new Vector3(0, 0.25f, 0), Quaternion.identity);
             g.Player.transform.position = new Vector3(0, 0, -0.6f);
             SetView(g.Player, 0, 40);
             yield return new WaitForSeconds(3f);
-            Log($"破坏测试: 薯片被牛奶压 damaged={chips.IsDamaged} (期望 True)");
+            Log($"破坏测试: 薯片被牛奶压 damaged={chips.IsDamaged} 原因={chips.LastCause} (期望 True Crush)");
+            Log($"破坏测试: 面包上放水果刀+罐头 damaged={bread2.IsDamaged} 原因={bread2.LastCause} 刀坏={knife.IsDamaged} (期望 True Pierce False) 刀位置={knife.transform.position} 面包位置={bread2.transform.position} 面包尺寸={bread2.Def.Size} 扎力={bread2.Parts.Max(p => p.PierceLoad):0.0}N 压力={bread2.Parts.Max(p => p.Load):0.0}N 上限={bread2.Parts.Min(p => p.Def.Crush)}");
             Log($"破坏测试: 鸡蛋 60cm 摔落 damaged={eggs.IsDamaged} (期望 True)");
             Log($"破坏测试: 鸡蛋 8cm 轻放 damaged={eggs2.IsDamaged} (期望 False)");
             Log($"破坏测试: 面包上放罐头 bread.damaged={bread.IsDamaged} (期望 False, 0.35kg≈3.4N < 12N)");
@@ -296,6 +310,11 @@ namespace CatMart
             yield return new WaitForSeconds(0.3f);
             yield return Shot("13_test_brief");
             HUD.TestBrief = false;
+            HUD.RulesPage = true;
+            yield return new WaitForSeconds(0.3f);
+            yield return Shot("13a_rules");
+            HUD.RulesPage = false;
+            HUD.TestBrief = false;
             var missing = TestLevel.Orders.SelectMany(o => o.Items).Where(id => ItemCatalog.Get(id) == null).ToList();
             g.StartTestLevel();
             Log($"测试关: test={g.IsTest} {g.DayOrders.Count}单 目标 {g.DayGoal:0.00} 找不到的商品 [{string.Join(",", missing)}]");
@@ -305,6 +324,10 @@ namespace CatMart
             SetView(g.Player, -40, 35);
             yield return new WaitForSeconds(4f);
             yield return Shot("14_test_order1");
+            g.Player.Cam.transform.position = new Vector3(1.12f, 1.45f, -0.5f);
+            g.Player.Cam.transform.LookAt(new Vector3(1.12f, Layout.CounterTop, 0.1f));
+            yield return new WaitForSeconds(0.2f);
+            yield return Shot("14b_racks");
             // 暂停：时间停住、耐心不掉；重来回到第 1 位顾客
             g.SetPaused(true);
             float p0 = g.Patience;
