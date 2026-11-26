@@ -49,7 +49,7 @@ namespace CatMart
         public static float DamageCost(ItemDefinition d) => d.Price * DamageRate;
 
         // ---- 规格 ----
-        public const float ReqMatch = 1.2f;          // 材质、尺寸、个数完全对
+        public const float ReqMatch = 1.1f;          // 材质、尺寸、个数完全对
         public const float ReqSizeWrong = 0.9f;      // 个数或尺寸不对
         public const float ReqMaterialWrong = 0.95f; // 材质不对（两样都不对就相乘）
 
