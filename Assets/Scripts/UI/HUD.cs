@@ -149,14 +149,14 @@ namespace CatMart
             var t = Settlement.TipTiers;
             string rules =
                 "<color=#F2C14E><b>每一单的钱</b></color>\n" +
-                $"工钱 = 订单总价 × {Settlement.Commission * 100:0}% × 总倍率\n" +
-                "本单实得 = 工钱 + 小费 − 赔偿\n\n" +
+                $"本单实得 = 订单总价 × {Settlement.Commission * 100:0}% × 总倍率 + 小费 − 赔偿\n\n" +
                 "<color=#F2C14E><b>总倍率 = 下面几项相乘</b></color>\n" +
-                "· 规格：袋子材质、尺寸、个数完全对 ×1.2；个数/尺寸不对 ×0.8；材质不对 ×0.6\n" +
-                "· 平衡：每个袋子的重心偏离中心多少（按重量加权）\n" +
-                "      很居中 ×1.3  →  略偏 ×1.0  →  一边重 ×0.6  →  严重偏 ×0.5\n" +
-                "      袋子被扎破最多 ×0.5，超重最多 ×0.4；高出袋口不稳每件再 ×0.8\n" +
-                $"· 漏装：每漏一件 ×0.9（大件放推车不算漏装）\n" +
+                $"· 规格：完全对 ×{Settlement.ReqMatch}；个数或尺寸不对 ×{Settlement.ReqSizeWrong}；材质不对 ×{Settlement.ReqMaterialWrong}（都不对就相乘）\n" +
+                $"· 平衡：每个袋子单独算，多个袋子取平均\n" +
+                $"      重心很居中 ×{Settlement.BalanceBest}  →  略偏 ×1.0  →  严重偏 ×{Settlement.BalanceWorst}\n" +
+                $"      高出袋口不稳每件再 ×{Settlement.UnstablePerItem}（最低 ×{Settlement.UnstableFloor}）；袋子扎破或超重最多 ×{Settlement.BrokenBagCap}\n" +
+                $"· 漏装：一件不漏 ×{Settlement.NoMissing}；每漏一件 ×{Settlement.MissingPerItem}\n" +
+                "      大件装进袋子、小件直接放推车，也算漏装\n" +
                 $"· 翻倒：每倒过一件“不能倒”的东西 ×{Settlement.TippedPerItem}（最低 ×{Settlement.TippedFloor}）\n" +
                 $"· 耐心：顾客等到没耐心了 ×{Settlement.ImpatientFactor}\n" +
                 $"· 记忆单：每天最后一单 ×{Settlement.MemoryBonus}\n\n" +
@@ -165,9 +165,8 @@ namespace CatMart
                 "弄坏东西、漏装、或者顾客等到没耐心 → 没有小费\n\n" +
                 "<color=#F2C14E><b>赔偿</b></color>\n" +
                 $"弄坏（压坏 / 扎坏 / 摔坏）的商品，按价格的 {Settlement.DamageRate * 100:0}% 赔\n\n" +
-                "<color=#F2C14E><b>星星（只看装得好不好，不算记忆单加成和小费）</b></color>\n" +
-                "总倍率 ≥1.4 ★★★  ·  ≥1.0 ★★  ·  ≥0.6 ★  ·  更低 没有星\n" +
-                "这一单弄坏了任何东西 → 再扣一颗星\n\n" +
+                "<color=#F2C14E><b>星星（只看总倍率，不算记忆单加成和小费）</b></color>\n" +
+                $"≥{Settlement.Star3} ★★★  ·  ≥{Settlement.Star2} ★★  ·  ≥{Settlement.Star1} ★  ·  更低 没有星；弄坏任何东西再扣一颗\n\n" +
                 "<color=#F2C14E><b>过关</b></color>\n" +
                 $"每天 {GameManager.CustomersPerDay} 位顾客，今日收入 ≥ 目标金额就过关\n" +
                 "目标 = 当天所有订单的基础工钱 × 目标比例（第 1 关 0.9，每关 +0.1，最高 1.35）";
@@ -195,8 +194,9 @@ namespace CatMart
                 "· 袋子<b>材质、尺寸、个数</b>要和顾客说的一样\n" +
                 "· 袋子里<b>重心要居中</b>，不要一边重一边轻\n" +
                 "· 别<b>压坏、扎坏、摔坏</b>商品（弄坏要赔半价）\n" +
-                "· <color=#5FE08A>不能倒</color>的东西（蛋糕、插花…）一直立着放，方底袋就是给它们准备的\n" +
+                "· <color=#5FE08A>不能倒</color>的东西（蛋糕、插花…）一直立着放，方底纸袋就是给它们准备的\n" +
                 "· 大件（整箱水、猫砂…）直接放顾客的购物车\n" +
+                "· 塑料袋软、矮、圆鼓鼓的，能兜住洋葱这种不规则的东西；纸袋硬、高、方方正正\n" +
                 "· 装得越快，<color=#7CFC9A>小费</color>越多\n\n" +
                 "<color=#F2C14E><b>商品光边的颜色</b></color>\n" +
                 "白 普通   <color=#FFD84D>黄 怕压</color>   <color=#FF7FB6>粉 易摔碎</color>   <color=#FF8A3D>橙 尖锐</color>   <color=#6FC3FF>蓝 大件</color>   <color=#5FE08A>绿 不能倒</color>\n\n" +
@@ -472,19 +472,19 @@ namespace CatMart
             GUILayout.BeginArea(r, _panel);
             GUILayout.Label($"订单结算  {new string('★', res.Stars)}{new string('☆', 3 - res.Stars)}", _title);
             GUILayout.Space(S(6));
-            GUILayout.Label("<color=#AAAAAA>星星看总倍率（不算记忆单加成）：≥1.4 ★★★ · ≥1.0 ★★ · ≥0.6 ★；弄坏东西再扣一颗</color>", _small);
+            GUILayout.Label($"<color=#AAAAAA>星星看总倍率（不算记忆单加成）：≥{Settlement.Star3} ★★★ · ≥{Settlement.Star2} ★★ · ≥{Settlement.Star1} ★；弄坏东西再扣一颗</color>", _small);
             var sb = new StringBuilder();
             sb.AppendLine($"订单总价 {U.Money(res.ItemsTotal)} × 提成 10% = 基础工钱 <b>{U.Money(res.BasePay)}</b>");
             sb.AppendLine();
             sb.AppendLine($"规格系数  ×{res.ReqFactor:0.00}   <color=#AAAAAA>{res.ReqNote}</color>");
-            sb.AppendLine($"平衡系数  ×{res.BalanceFactor:0.00}");
+            sb.AppendLine($"平衡系数  ×{res.BalanceFactor:0.00}" + (res.Bags.Count > 1 ? $"   <color=#AAAAAA>{res.Bags.Count} 个袋子取平均</color>" : ""));
             foreach (var b in res.Bags)
             {
                 string c = b.Factor >= 1.15f ? "#7CFC9A" : b.Factor >= 0.9f ? "#F2C14E" : "#FF6B5B";
                 sb.AppendLine($"    · {b.Spec.Name}  {b.ItemCount}件 {b.Mass:0.0}kg  偏心 {b.Imbalance * 100:0}%  <color={c}>×{b.Factor:0.00} {b.Note}</color>");
             }
             if (res.PatienceFactor < 1f) sb.AppendLine($"耐心系数  ×{res.PatienceFactor:0.00}   <color=#FF6B5B>顾客等太久了</color>");
-            sb.AppendLine($"漏装系数  ×{res.MissingFactor:0.00}" + (res.Missing > 0 ? $"   <color=#FF6B5B>漏装 {res.Missing} 件: {string.Join("、", res.MissingNames.Take(4))}</color>" : ""));
+            sb.AppendLine($"漏装系数  ×{res.MissingFactor:0.00}" + (res.Missing > 0 ? $"   <color=#FF6B5B>漏装 {res.Missing} 件: {string.Join("、", res.MissingNames.Take(4))}</color>" : "   <color=#AAAAAA>一件不漏</color>"));
             if (res.TippedNames.Count > 0)
                 sb.AppendLine($"翻倒系数  ×{res.ToppleFactor:0.00}   <color=#FF6B5B>倒了 {res.TippedNames.Count} 件: {string.Join("、", res.TippedNames.Take(4))}</color>");
             if (res.MemoryFactor > 1f)

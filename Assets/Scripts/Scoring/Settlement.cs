@@ -40,21 +40,38 @@ namespace CatMart
         public List<BagResult> Bags = new List<BagResult>();
     }
 
-    /// <summary>结算规则（详见 Docs/GDD_Chapter1.md）。</summary>
+    /// <summary>结算规则（详见 Docs/GDD_Chapter1.md，游戏里开场「计分规则」页面也会显示）。</summary>
     public static class Settlement
     {
         public const float Commission = 0.10f;
         /// <summary>弄坏商品的赔偿 = 商品价格 × 这个比例。</summary>
         public const float DamageRate = 0.5f;
         public static float DamageCost(ItemDefinition d) => d.Price * DamageRate;
-        /// <summary>每件质心高出袋口的商品，该袋系数 ×0.8，最低 ×0.4。</summary>
-        public const float UnstablePerItem = 0.8f, UnstableFloor = 0.4f;
-        /// <summary>每件翻倒的"不能倒"商品，总倍率 ×0.75，最低 ×0.4。</summary>
-        public const float TippedPerItem = 0.75f, TippedFloor = 0.4f;
+
+        // ---- 规格 ----
+        public const float ReqMatch = 1.2f;          // 材质、尺寸、个数完全对
+        public const float ReqSizeWrong = 0.9f;      // 个数或尺寸不对
+        public const float ReqMaterialWrong = 0.95f; // 材质不对（两样都不对就相乘）
+
+        // ---- 平衡（每个袋子算一个系数，多个袋子取平均）----
+        public const float BalanceBest = 1.2f, BalanceWorst = 0.8f;
+        /// <summary>每件质心高出袋口的商品，该袋系数再 ×0.95（最低 ×0.75）。</summary>
+        public const float UnstablePerItem = 0.95f, UnstableFloor = 0.75f;
+        /// <summary>袋子被扎破 / 超重提起时破了：该袋系数最多这么多。</summary>
+        public const float BrokenBagCap = 0.8f;
+
+        // ---- 漏装 ----
+        public const float MissingPerItem = 0.9f, NoMissing = 1.2f;
+
+        /// <summary>每件翻倒的"不能倒"商品，总倍率 ×0.9，最低 ×0.75。</summary>
+        public const float TippedPerItem = 0.9f, TippedFloor = 0.75f;
         /// <summary>记忆单（每天最后一位顾客，没有光边和属性说明）的奖励倍率。</summary>
         public const float MemoryBonus = 1.2f;
         /// <summary>顾客等到没耐心了 → 工钱 ×0.85。</summary>
         public const float ImpatientFactor = 0.85f;
+
+        /// <summary>星星：总倍率（不算记忆单加成）达到这些值。</summary>
+        public const float Star3 = 1.2f, Star2 = 1.0f, Star1 = 0.7f;
 
         /// <summary>小费档次：剩余耐心 ≥ Min 时给 订单总价 × Rate 的小费。</summary>
         public static readonly (float Min, float Rate, string Name)[] TipTiers =
@@ -64,12 +81,13 @@ namespace CatMart
             (0.0001f, 0.01f, "一点点小费"),
         };
 
+        /// <summary>单个袋子的平衡系数。r = 重心水平偏移 / 半宽。</summary>
         public static float BalanceFactor(float r)
         {
-            if (r <= 0.15f) return 1.3f;
-            if (r <= 0.3f) return Mathf.Lerp(1.3f, 1.0f, (r - 0.15f) / 0.15f);
-            if (r <= 0.6f) return Mathf.Lerp(1.0f, 0.6f, (r - 0.3f) / 0.3f);
-            return 0.5f;
+            if (r <= 0.15f) return BalanceBest;
+            if (r <= 0.3f) return Mathf.Lerp(BalanceBest, 1.0f, (r - 0.15f) / 0.15f);
+            if (r <= 0.6f) return Mathf.Lerp(1.0f, BalanceWorst, (r - 0.3f) / 0.3f);
+            return BalanceWorst;
         }
 
         public static OrderResult Evaluate(CustomerOrder order, IList<GroceryItem> items, IList<Bag> bags,
@@ -78,7 +96,7 @@ namespace CatMart
             var r = new OrderResult { ItemsTotal = order.ItemsTotal };
             r.BasePay = r.ItemsTotal * Commission;
 
-            // 1) 归属
+            // 1) 归属：小件要在袋子里，大件要在推车里；放错地方都算漏装
             var assigned = new Dictionary<Bag, List<GroceryItem>>();
             foreach (var b in bags) assigned[b] = new List<GroceryItem>();
             foreach (var it in items)
@@ -89,15 +107,22 @@ namespace CatMart
                 if (it.Tipped && !it.IsDamaged) r.TippedNames.Add(it.Def.Name);
 
                 Bag home = bags.FirstOrDefault(b => b.Contains(it));
+                if (it.Def.Bulky)
+                {
+                    if (inCart(it)) continue;
+                    if (it.IsDamaged) continue; // 已经赔过了
+                    r.Missing++;
+                    r.MissingNames.Add(it.Def.Name + (home != null ? "（大件要放推车，不能装袋）" : ""));
+                    continue;
+                }
                 if (home != null) { assigned[home].Add(it); continue; }
                 if (it.IsDamaged) continue; // 已经赔过了
-                if (it.Def.Bulky && inCart(it)) continue;
                 r.Missing++;
-                r.MissingNames.Add(it.Def.Name + (inCart(it) ? "（非大件不能直接放推车）" : ""));
+                r.MissingNames.Add(it.Def.Name + (inCart(it) ? "（小件要装袋，不能直接放推车）" : ""));
             }
 
             // 2) 每个袋子
-            float massSum = 0, weighted = 0;
+            float factorSum = 0;
             foreach (var kv in assigned)
             {
                 if (kv.Value.Count == 0) continue;
@@ -117,44 +142,44 @@ namespace CatMart
                     br.Factor *= Mathf.Max(UnstableFloor, Mathf.Pow(UnstablePerItem, st.Unstable));
                     br.Note += $"，{st.Unstable}件高出袋口不稳";
                 }
-                if (b.Torn) { br.Factor = Mathf.Min(br.Factor, 0.5f); br.Note = "袋子被刺破"; }
-                if (st.Overweight) { br.Factor = Mathf.Min(br.Factor, 0.4f); br.Note = $"超重 ({st.Mass:0.0}/{b.Spec.CapacityKg}kg) 提起时破了"; }
+                if (b.Torn) { br.Factor = Mathf.Min(br.Factor, BrokenBagCap); br.Note = "袋子被刺破"; }
+                if (st.Overweight) { br.Factor = Mathf.Min(br.Factor, BrokenBagCap); br.Note = $"超重 ({st.Mass:0.0}/{b.Spec.CapacityKg}kg) 提起时破了"; }
                 r.Bags.Add(br);
-                massSum += Mathf.Max(0.05f, st.Mass);
-                weighted += br.Factor * Mathf.Max(0.05f, st.Mass);
+                factorSum += br.Factor;
             }
-            r.BalanceFactor = massSum > 0 ? weighted / massSum : 0.5f;
+            // 多个袋子：每个袋子的系数取平均
+            r.BalanceFactor = r.Bags.Count > 0 ? factorSum / r.Bags.Count : BalanceWorst;
 
-            // 3) 规格
+            // 3) 规格：材质不对 ×0.95；个数/尺寸不对 ×0.9；都不对就相乘
             var used = r.Bags.Select(b => b.Spec).ToList();
             if (used.Count == 0)
             {
-                r.ReqFactor = 0.6f; r.ReqNote = "一个袋子都没用";
-            }
-            else if (used.Any(s => s.Material != order.Material))
-            {
-                r.ReqFactor = 0.6f; r.ReqNote = $"顾客要的是{(order.Material == BagMaterial.Paper ? "纸袋" : "塑料袋")}";
+                r.ReqFactor = ReqSizeWrong; r.ReqNote = "一个袋子都没用";
             }
             else
             {
-                bool match = true;
+                bool materialOk = used.All(s => s.Material == order.Material);
+                bool sizeOk = true;
                 foreach (BagSize s in BagSpec.AllSizes)
                 {
                     int want = order.Bags.TryGetValue(s, out int w) ? w : 0;
                     int got = used.Count(u => u.Size == s);
-                    if (want != got) match = false;
+                    if (want != got) sizeOk = false;
                 }
-                r.ReqMatch = match;
-                r.ReqFactor = match ? 1.2f : 0.8f;
-                string usedText = string.Join(" + ", used.GroupBy(u => u.Size).OrderByDescending(g => g.Key)
-                    .Select(g => $"{g.Count()}个{g.First().Name}"));
-                r.ReqNote = match ? "完全符合要求" : $"要求 {order.BagRequestText}，实际 {usedText}";
+                r.ReqMatch = materialOk && sizeOk;
+                string usedText = string.Join(" + ", used.GroupBy(u => u.Name).Select(g => $"{g.Count()}个{g.Key}"));
+                if (r.ReqMatch) { r.ReqFactor = ReqMatch; r.ReqNote = "完全符合要求"; }
+                else
+                {
+                    r.ReqFactor = (materialOk ? 1f : ReqMaterialWrong) * (sizeOk ? 1f : ReqSizeWrong);
+                    string what = !materialOk && !sizeOk ? "材质和个数/尺寸都不对" : !materialOk ? "材质不对" : "个数/尺寸不对";
+                    r.ReqNote = $"{what}：要求 {order.BagRequestText}，实际 {usedText}";
+                }
             }
 
-            // 4) 耐心 & 漏装
+            // 4) 耐心、漏装、翻倒、记忆单
             r.PatienceFactor = patience01 > 0 ? 1f : ImpatientFactor;
-            r.MissingFactor = Mathf.Pow(0.9f, r.Missing);
-
+            r.MissingFactor = r.Missing == 0 ? NoMissing : Mathf.Pow(MissingPerItem, r.Missing);
             r.ToppleFactor = r.TippedNames.Count == 0 ? 1f : Mathf.Max(TippedFloor, Mathf.Pow(TippedPerItem, r.TippedNames.Count));
             r.MemoryFactor = memoryOrder ? MemoryBonus : 1f;
 
@@ -179,7 +204,7 @@ namespace CatMart
 
             r.Net = r.Pay + r.Tip - r.DamagePenalty;
             float q = r.Multiplier / r.MemoryFactor; // 星级只看装得好不好
-            r.Stars = q >= 1.4f ? 3 : q >= 1.0f ? 2 : q >= 0.6f ? 1 : 0;
+            r.Stars = q >= Star3 ? 3 : q >= Star2 ? 2 : q >= Star1 ? 1 : 0;
             if (r.DamagedNames.Count > 0) r.Stars = Mathf.Max(0, r.Stars - 1);
             return r;
         }

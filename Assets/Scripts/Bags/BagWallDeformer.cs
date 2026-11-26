@@ -63,6 +63,26 @@ namespace CatMart
             return d;
         }
 
+        // ------------------------------------------------------------ 塑料袋外形（圆鼓鼓的）
+        /// <summary>塑料袋袋身比名义尺寸每侧多鼓出的量（米）。</summary>
+        public const float PlasticBulge = 0.012f;
+
+        /// <summary>塑料袋高度方向的轮廓：底部和袋口稍收，中间最鼓。t = 高度 0..1。</summary>
+        public static float PlasticProfile(float t) => 0.95f + 0.05f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t) * 0.85f);
+
+        /// <summary>
+        /// 塑料袋水平截面：圆角矩形（超椭圆 n≈3.2）。phi = 参数角：π/2 是正前方(+z)，0 是右侧(+x)。
+        /// 返回 (x, z)。
+        /// </summary>
+        public static Vector2 PlasticOutline(float phi, float w, float d, float t)
+        {
+            float s = PlasticProfile(t);
+            float a = (w / 2 + PlasticBulge) * s, b = (d / 2 + PlasticBulge) * s;
+            float c = Mathf.Cos(phi), sn = Mathf.Sin(phi);
+            const float e = 2f / 3.2f;
+            return new Vector2(a * Mathf.Sign(c) * Mathf.Pow(Mathf.Abs(c), e), b * Mathf.Sign(sn) * Mathf.Pow(Mathf.Abs(sn), e));
+        }
+
         // ------------------------------------------------------------ 生成静止形状（与原袋型一致）
         void Build(BagSpec spec)
         {
@@ -88,9 +108,22 @@ namespace CatMart
                 for (int i = 0; i <= nx; i++)
                 {
                     float x = (i / (float)nx - 0.5f) * w, y = j / (float)ny * h;
-                    if (j == ny) y -= Zig(x);
-                    float bulge = Mathf.Sin(Mathf.Clamp01(y / h) * Mathf.PI * 0.9f) * (_paper ? 0.003f : 0.008f) * (1 - Mathf.Pow(2 * x / w, 2));
-                    var p = new Vector3(x, y, side * (d / 2 + bulge));
+                    Vector3 p;
+                    if (_paper)
+                    {
+                        if (j == ny) y -= Zig(x);
+                        float bulge = Mathf.Sin(Mathf.Clamp01(y / h) * Mathf.PI * 0.9f) * 0.003f * (1 - Mathf.Pow(2 * x / w, 2));
+                        p = new Vector3(x, y, side * (d / 2 + bulge));
+                    }
+                    else
+                    {
+                        // 塑料袋：圆角截面、袋身外鼓
+                        float u = i / (float)nx;
+                        float phi = side > 0 ? Mathf.Lerp(Mathf.PI * 0.75f, Mathf.PI * 0.25f, u) : Mathf.Lerp(Mathf.PI * 1.25f, Mathf.PI * 1.75f, u);
+                        var o = PlasticOutline(phi, w, d, y / h);
+                        p = new Vector3(o.x, y, o.y);
+                        x = o.x;
+                    }
                     p.z += side * Wr(p);
                     rest.Add(p);
                     uv.Add(new Vector2(x * (_paper ? 3 : 2), y * (_paper ? 3 : 2)));
@@ -106,9 +139,22 @@ namespace CatMart
                 for (int k = 0; k <= nz; k++)
                 {
                     float z = (k / (float)nz - 0.5f) * d, y = j / (float)ny * h;
-                    if (j == ny) y -= Zig(z + 1);
-                    float fold = d * creaseFrac * (1 - Mathf.Abs(z) / (d / 2)) * Mathf.SmoothStep(0, 1, y / (h * creaseStart));
-                    var p = new Vector3(side * (w / 2 - fold), y, z);
+                    Vector3 p;
+                    if (_paper)
+                    {
+                        if (j == ny) y -= Zig(z + 1);
+                        float fold = d * creaseFrac * (1 - Mathf.Abs(z) / (d / 2)) * Mathf.SmoothStep(0, 1, y / (h * creaseStart));
+                        p = new Vector3(side * (w / 2 - fold), y, z);
+                    }
+                    else
+                    {
+                        // 塑料袋两侧也是外鼓的圆弧（没有纸袋那种向内折的风琴褶）
+                        float u = k / (float)nz;
+                        float phi = side > 0 ? Mathf.Lerp(-Mathf.PI * 0.25f, Mathf.PI * 0.25f, u) : Mathf.Lerp(Mathf.PI * 1.25f, Mathf.PI * 0.75f, u);
+                        var o = PlasticOutline(phi, w, d, y / h);
+                        p = new Vector3(o.x, y, o.y);
+                        z = o.y;
+                    }
                     p.x += side * Wr(p);
                     rest.Add(p);
                     uv.Add(new Vector2(z * (_paper ? 3 : 2), y * (_paper ? 3 : 2)));
@@ -253,7 +299,7 @@ namespace CatMart
             float restAbs = Vector3.Dot(r, outward);
             // 起点在袋壁碰撞体内部（不会打到袋子自己），朝袋子中心发射
             Vector3 originLocal = r;
-            float start = half + _spec.Stretch + 0.004f;   // 起点在袋壁碰撞体内部
+            float start = Mathf.Max(half + _spec.Stretch, restAbs) + 0.004f;   // 起点在袋壁外侧（塑料袋静止时就比名义尺寸鼓）
             if (g.Axis == 0) originLocal.x = g.Sign * start; else originLocal.z = g.Sign * start;
             Vector3 origin = tr.TransformPoint(originLocal);
             Vector3 dir = tr.TransformDirection(-outward);
@@ -269,7 +315,7 @@ namespace CatMart
             }
             if (best == float.MaxValue) return 0f;
             float contentAbs = start - best + 0.003f; // 商品外沿离中心的距离 + 3mm 余量
-            float targetAbs = Mathf.Clamp(contentAbs, restAbs, limit);
+            float targetAbs = Mathf.Clamp(contentAbs, restAbs, Mathf.Max(limit, restAbs));
             return targetAbs - restAbs;
         }
     }

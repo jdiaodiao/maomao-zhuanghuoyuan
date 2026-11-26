@@ -4,7 +4,7 @@ using UnityEngine;
 namespace CatMart
 {
     public enum BagMaterial { Plastic, Paper }
-    /// <summary>Square = 方底袋（只有塑料的）：底面是正方形，蛋糕、甜甜圈盒这种宽而扁、又不能倒的东西用。</summary>
+    /// <summary>Square = 方底袋（纸袋才有）：底面是正方形，蛋糕、甜甜圈盒这种宽而扁、又不能倒的东西用。</summary>
     public enum BagSize { Medium, Large, Square }
 
     public struct BagSpec
@@ -15,8 +15,8 @@ namespace CatMart
         public float CapacityKg;
         public float MinSharp;      // 尖锐度达到此值才可能刺破
         public float PunctureForce; // 力×尖锐度 超过此值刺破
-        /// <summary>袋壁弹性：碰撞墙比名义尺寸每侧多让出的距离（米）。塑料袋 1.5cm，纸袋 0。</summary>
-        public float Stretch => Material == BagMaterial.Plastic ? 0.015f : 0f;
+        /// <summary>袋壁弹性：碰撞墙比名义尺寸每侧多让出的距离（米）。塑料袋 2cm（软、能兜住不规则的东西），纸袋 0。</summary>
+        public float Stretch => Material == BagMaterial.Plastic ? 0.02f : 0f;
 
         public string MaterialName => Material == BagMaterial.Paper ? "纸袋" : "塑料袋";
         public string SizeName => Size == BagSize.Square ? "方底" : Size == BagSize.Medium ? "中号" : "大号";
@@ -24,9 +24,9 @@ namespace CatMart
         public string Name => SizeName + MaterialName;
         public float Volume => Inner.x * Inner.y * Inner.z;
 
-        /// <summary>每种材质有哪些尺寸：塑料 中/大/方底，纸袋 中/大。</summary>
+        /// <summary>每种材质有哪些尺寸：塑料 中/大，纸袋 中/大/方底。</summary>
         public static BagSize[] SizesFor(BagMaterial m) =>
-            m == BagMaterial.Plastic ? new[] { BagSize.Medium, BagSize.Large, BagSize.Square } : new[] { BagSize.Medium, BagSize.Large };
+            m == BagMaterial.Plastic ? new[] { BagSize.Medium, BagSize.Large } : new[] { BagSize.Medium, BagSize.Large, BagSize.Square };
 
         public static readonly BagSize[] AllSizes = { BagSize.Large, BagSize.Medium, BagSize.Square };
 
@@ -39,6 +39,7 @@ namespace CatMart
                 switch (s)
                 {
                     case BagSize.Medium: spec.Inner = U.Cm(28, 30, 17); spec.CapacityKg = 9; break;
+                    case BagSize.Square: spec.Inner = U.Cm(30, 28, 30); spec.CapacityKg = 9; break;
                     default: spec.Inner = U.Cm(34, 40, 22); spec.CapacityKg = 12; break;
                 }
             }
@@ -47,9 +48,9 @@ namespace CatMart
                 spec.MinSharp = 0.4f; spec.PunctureForce = 6f;
                 switch (s)
                 {
-                    case BagSize.Medium: spec.Inner = U.Cm(30, 34, 18); spec.CapacityKg = 7; break;
-                    case BagSize.Square: spec.Inner = U.Cm(30, 28, 30); spec.CapacityKg = 8; break;
-                    default: spec.Inner = U.Cm(36, 40, 22); spec.CapacityKg = 10; break;
+                    // 塑料袋比纸袋矮、更宽一点（袋身是圆鼓鼓的）
+                    case BagSize.Medium: spec.Inner = U.Cm(32, 26, 20); spec.CapacityKg = 7; break;
+                    default: spec.Inner = U.Cm(38, 32, 24); spec.CapacityKg = 10; break;
                 }
             }
             return spec;

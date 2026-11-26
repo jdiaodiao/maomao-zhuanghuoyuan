@@ -25,7 +25,7 @@ namespace CatMart
             {
                 var pl = OrderGenerator.FittingSizes(d, BagMaterial.Plastic).ToList();
                 var pa = OrderGenerator.FittingSizes(d, BagMaterial.Paper).ToList();
-                if (pl.Count == 3 && pa.Count == 2) continue;
+                if (pl.Count == 2 && pa.Count == 3) continue;
                 Log($"袋子适配: {d.Name}{(d.Upright ? "[不能倒]" : "")} 尺寸 {d.Size.x * 100:0}×{d.Size.y * 100:0}×{d.Size.z * 100:0}cm 塑料[{string.Join(",", pl)}] 纸[{string.Join(",", pa)}]" +
                     (pl.Count + pa.Count == 0 ? " ← 哪个袋子都放不下!" : ""));
             }
@@ -328,6 +328,15 @@ namespace CatMart
             g.Player.Cam.transform.LookAt(new Vector3(1.12f, Layout.CounterTop, 0.1f));
             yield return new WaitForSeconds(0.2f);
             yield return Shot("14b_racks");
+            g.SpawnBag(BagSpec.Get(BagMaterial.Plastic, BagSize.Medium));
+            g.SpawnBag(BagSpec.Get(BagMaterial.Plastic, BagSize.Large));
+            g.SpawnBag(BagSpec.Get(BagMaterial.Paper, BagSize.Large));
+            g.SpawnBag(BagSpec.Get(BagMaterial.Paper, BagSize.Square));
+            float midX = (Layout.BagSlotX[0] + Layout.BagSlotX[3]) / 2f;
+            g.Player.Cam.transform.position = new Vector3(midX, Layout.CounterTop + 0.55f, Layout.BagSlotZ - 0.95f);
+            g.Player.Cam.transform.LookAt(new Vector3(midX, Layout.CounterTop + 0.12f, Layout.BagSlotZ));
+            yield return new WaitForSeconds(0.3f);
+            yield return Shot("14c_bags");
             // 暂停：时间停住、耐心不掉；重来回到第 1 位顾客
             g.SetPaused(true);
             float p0 = g.Patience;

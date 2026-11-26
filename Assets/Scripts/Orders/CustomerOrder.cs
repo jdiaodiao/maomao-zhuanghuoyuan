@@ -129,14 +129,15 @@ namespace CatMart
             BagSpec.SizesFor(m).Where(s => BagSpec.Get(m, s).Fits(d));
 
         /// <summary>
-        /// 有商品放不进这种材质的任何袋子（比如甜甜圈盒只能立着进方底袋）→ 改用塑料袋；
+        /// 有商品放不进这种材质的任何袋子（比如甜甜圈盒只能立着进方底纸袋）→ 换另一种材质（如果那边都放得下）；
         /// 哪种袋子都放不进的商品直接去掉（理论上不会有，自动测试会检查）。
         /// </summary>
         static void FixMaterial(CustomerOrder o)
         {
             var bagItems = o.Items.Where(i => !i.Bulky).ToList();
-            if (o.Material == BagMaterial.Paper && bagItems.Any(i => !FittingSizes(i, BagMaterial.Paper).Any()))
-                o.Material = BagMaterial.Plastic;
+            var other = o.Material == BagMaterial.Paper ? BagMaterial.Plastic : BagMaterial.Paper;
+            if (bagItems.Any(i => !FittingSizes(i, o.Material).Any()) && bagItems.All(i => FittingSizes(i, other).Any()))
+                o.Material = other;
             o.Items.RemoveAll(i => !i.Bulky && !FittingSizes(i, o.Material).Any());
         }
 

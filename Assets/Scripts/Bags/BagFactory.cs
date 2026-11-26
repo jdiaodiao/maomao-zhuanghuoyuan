@@ -119,7 +119,17 @@ namespace CatMart
         {
             float w = spec.Inner.x, h = spec.Inner.y, d = spec.Inner.z;
             var v = new VisualSet();
-            v.Add(Shapes.Quad(w, d), new Vector3(0, 0.001f, 0), Quaternion.Euler(90, 0, 0), FilmMat);
+            // 袋底：和袋身一样的圆角截面
+            var bottom = new MB();
+            bottom.Vert(new Vector3(0, 0.001f, 0), Vector3.up, new Vector2(0.5f, 0.5f));
+            const int seg = 48;
+            for (int k = 0; k <= seg; k++)
+            {
+                var o = BagWallDeformer.PlasticOutline(k / (float)seg * Mathf.PI * 2f, w, d, 0f);
+                bottom.Vert(new Vector3(o.x, 0.001f, o.y), Vector3.up, new Vector2(0.5f + o.x / w, 0.5f + o.y / d));
+            }
+            for (int k = 1; k <= seg; k++) { bottom.Tri(0, k + 1, k); bottom.Tri(0, k, k + 1); }
+            v.Add(bottom, FilmMat);
 
             // 提手：两侧各一个扁环
             for (int side = -1; side <= 1; side += 2)
@@ -137,11 +147,13 @@ namespace CatMart
             }
             // 印刷：蓝色 CatMart
             var st = new LabelStyle { Brand = "CatMart", Title = "谢谢惠顾", Bg = Color.white, Bg2 = Color.white, Accent = PlasticBlue, Ink = PlasticBlue, BrandInk = Color.white, Icon = LabelIcon.Cat, IconColor = PlasticBlue, Seed = 22 };
-            var tex = LabelBaker.Sticker(new Vector2(w * 0.55f, h * 0.35f), st, true);
+            // 印在鼓起来的袋身正中（小一点，平面贴在弧面上不明显）
+            var tex = LabelBaker.Sticker(new Vector2(w * 0.42f, h * 0.32f), st, true);
             var print = Mats.Glass(Color.white, 0.85f, 0.5f);
             print.mainTexture = tex;
-            v.Add(Shapes.Quad(w * 0.55f, h * 0.35f), new Vector3(0, h * 0.5f, -d / 2 - 0.012f), Quaternion.identity, print);
-            v.Add(Shapes.Quad(w * 0.55f, h * 0.35f), new Vector3(0, h * 0.5f, d / 2 + 0.012f), Quaternion.Euler(0, 180, 0), print);
+            float front = BagWallDeformer.PlasticOutline(Mathf.PI / 2, w, d, 0.5f).y + 0.004f;
+            v.Add(Shapes.Quad(w * 0.42f, h * 0.32f), new Vector3(0, h * 0.5f, -front), Quaternion.identity, print);
+            v.Add(Shapes.Quad(w * 0.42f, h * 0.32f), new Vector3(0, h * 0.5f, front), Quaternion.Euler(0, 180, 0), print);
             return v;
         }
 
